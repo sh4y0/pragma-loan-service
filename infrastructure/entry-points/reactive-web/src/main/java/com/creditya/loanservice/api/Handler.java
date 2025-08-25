@@ -6,6 +6,7 @@ import com.creditya.loanservice.api.exception.service.ValidationService;
 import com.creditya.loanservice.api.mapper.LoanMapper;
 import com.creditya.loanservice.usecase.LoanUseCase;
 import com.creditya.loanservice.usecase.exception.BaseException;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
@@ -23,17 +24,22 @@ public class Handler {
 
     public Mono<ServerResponse> createLoan(ServerRequest serverRequest) {
         return serverRequest.bodyToMono(LoanDTO.class)
-                .flatMap(validator::validate)
-                .flatMap(dto -> {
-                    var domain = loanMapper.toDomain(dto);
-                    return loanUseCase.createLoan(domain, dto.loanType());
-                })
-                .flatMap(response
-                        -> ServerResponse.created(URI.create("/api/v1/loan"))
-                        .bodyValue(response))
-                .onErrorResume(ex -> Mono.error(
-                        ex instanceof BaseException ? ex : new UnexpectedException(ex)
-                ));
+                .flatMap(validator::validate) // valida DTO
+                .flatMap(loanDto -> loanUseCase.createLoan(loanMapper.toDomain(loanDto), loanDto.loanType()))
+                .flatMap(savedLoan ->
+                        ServerResponse.created(URI.create("/api/v1/loan/" + savedLoan.getLoanId()))
+                                .build()
+                )
+                .onErrorResume(BaseException.class, ex ->
+                        ServerResponse.badRequest().bodyValue(ex.getMessage())
+                )
+                .onErrorResume(Exception.class, ex ->
+                        ServerResponse.status(500).bodyValue("Unexpected error: " + ex.getMessage())
+                );
+    }
 
+    public Mono<Void> createLoanDoc(@RequestBody(description = "Request - for Loan")
+                                 LoanDTO dto) {
+        return Mono.empty();
     }
 }
