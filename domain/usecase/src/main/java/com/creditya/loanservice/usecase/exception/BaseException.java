@@ -14,7 +14,7 @@ public class BaseException extends RuntimeException {
     private final LocalDateTime timestamp;
     private final Map<String, String> errors;
 
-    protected BaseException(String errorCode, String title, String message, int status, Map<String, String> errors) {
+    public BaseException(String errorCode, String title, String message, int status, Map<String, String> errors) {
         super(message);
         this.errorCode = errorCode;
         this.title = title;

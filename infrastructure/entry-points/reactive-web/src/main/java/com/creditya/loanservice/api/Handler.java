@@ -24,18 +24,19 @@ public class Handler {
 
     public Mono<ServerResponse> createLoan(ServerRequest serverRequest) {
         return serverRequest.bodyToMono(LoanDTO.class)
-                .flatMap(validator::validate) // valida DTO
+                .flatMap(validator::validate)
                 .flatMap(loanDto -> loanUseCase.createLoan(loanMapper.toDomain(loanDto), loanDto.loanType()))
                 .flatMap(savedLoan ->
                         ServerResponse.created(URI.create("/api/v1/loan/" + savedLoan.getLoanId()))
                                 .build()
                 )
-                .onErrorResume(BaseException.class, ex ->
-                        ServerResponse.badRequest().bodyValue(ex.getMessage())
+                .then(ServerResponse
+                        .created(URI.create("/api/v1/users"))
+                        .build()
                 )
-                .onErrorResume(Exception.class, ex ->
-                        ServerResponse.status(500).bodyValue("Unexpected error: " + ex.getMessage())
-                );
+                .onErrorResume(ex -> Mono.error(
+                        ex instanceof BaseException ? ex : new UnexpectedException(ex)
+                ));
     }
 
     public Mono<Void> createLoanDoc(@RequestBody(description = "Request - for Loan")

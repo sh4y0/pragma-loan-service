@@ -2,10 +2,10 @@ package com.creditya.loanservice.usecase.exception;
 
 import com.creditya.loanservice.usecase.utils.ErrorCatalog;
 
-public class LoanNotFoundException extends BaseException{
-    private static final ErrorCatalog error = ErrorCatalog.LOAN_NOT_FOUND;
+public class LoanTypeNotFoundException extends BaseException{
+    private static final ErrorCatalog error = ErrorCatalog.LOAN_TYPE_NOT_FOUND;
 
-    public LoanNotFoundException() {
+    public LoanTypeNotFoundException() {
         super(
                 error.getCode(),
                 error.getTitle(),

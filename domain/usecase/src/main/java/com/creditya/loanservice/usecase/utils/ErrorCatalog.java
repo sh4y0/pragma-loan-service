@@ -9,10 +9,10 @@ import java.util.Map;
 @AllArgsConstructor
 public enum ErrorCatalog {
 
-    LOAN_NOT_FOUND(
-            "LOAN_NOT_FOUND",
-            "Loan Not Found",
-            "The specified loan does not exist in the system.",
+    LOAN_TYPE_NOT_FOUND(
+            "LOAN_TPE_NOT_FOUND",
+            "Loan type Not Found",
+            "The specified loan type does not exist in the system.",
             404,
             Map.of("loan", "The loan you requested could not be found. Please verify the ID or DNI.")
     ),
@@ -25,9 +25,9 @@ public enum ErrorCatalog {
             Map.of("status", "The provided loan status is invalid or missing in the database.")
     ),
 
-    LOAN_TYPE_NOT_FOUND(
-            "LOAN_TYPE_NOT_FOUND",
-            "Loan Type Not Found",
+    LOAN_ALREADY_EXISTS(
+            "LOAN_ALREADY_EXISTS",
+            "Loan already exists",
             "The requested loan type could not be found.",
             404,
             Map.of("loanType", "The loan type you provided does not exist in the system.")

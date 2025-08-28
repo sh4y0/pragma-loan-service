@@ -2,9 +2,11 @@ package com.creditya.loanservice.api.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
+import lombok.Builder;
 
 import java.math.BigDecimal;
 
+@Builder
 @Schema(name = "LoanDTO", description = "Request data required for Loan")
 public record LoanDTO(@NotNull(message = "Amount cannot be null")
                       @DecimalMin(value= "0.0", inclusive = true, message = "Amount cannot be less than 0")
@@ -18,8 +20,11 @@ public record LoanDTO(@NotNull(message = "Amount cannot be null")
                       int loanTerm,
 
                       @NotBlank(message = "Email cannot be blank")
-                      @Email(message = "A valid email address is required")
-                      @Schema(description = "Email of the applicant", example = "gutierrezherrada@gmail.com")
+                      @Pattern(
+                              regexp = "^(?!.*\\.\\.)[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+                              message = "Email format is invalid"
+                      )
+                      @Schema(description = "User's Email", example = "gutierrezherrada@gmail.com")
                       String email,
 
                       @NotBlank(message = "DNI cannot be blank")

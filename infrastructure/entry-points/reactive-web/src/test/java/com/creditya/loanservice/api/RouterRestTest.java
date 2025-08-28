@@ -1,60 +1,132 @@
 package com.creditya.loanservice.api;
 
-import org.assertj.core.api.Assertions;
+import com.creditya.loanservice.api.dto.request.LoanDTO;
+import com.creditya.loanservice.api.exception.GlobalExceptionFilter;
+import com.creditya.loanservice.api.exception.service.ValidationService;
+import com.creditya.loanservice.api.mapper.LoanMapper;
+import com.creditya.loanservice.model.utils.gateways.UseCaseLogger;
+import com.creditya.loanservice.usecase.LoanUseCase;
+import com.creditya.loanservice.usecase.exception.BaseException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.reactive.function.server.RouterFunctions;
+import reactor.core.publisher.Mono;
 
-@ContextConfiguration(classes = {RouterRest.class, Handler.class})
+import java.math.BigDecimal;
+import java.util.Map;
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+@ContextConfiguration(classes = {RouterRest.class, Handler.class, GlobalExceptionFilter.class})
 @WebFluxTest
 class RouterRestTest {
+
+    @MockitoBean
+    private LoanUseCase loanUseCase;
+
+    @MockitoBean
+    private LoanMapper loanMapper;
+
+    @MockitoBean
+    private ValidationService validator;
 
     @Autowired
     private WebTestClient webTestClient;
 
-    @Test
-    void testListenGETUseCase() {
-        webTestClient.get()
-                .uri("/api/usecase/path")
-                .accept(MediaType.APPLICATION_JSON)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody(String.class)
-                .value(userResponse -> {
-                            Assertions.assertThat(userResponse).isEmpty();
-                        }
-                );
+    @MockitoBean
+    private UseCaseLogger useCaseLogger;
+
+    private LoanDTO loanDTO;
+
+    @BeforeEach
+    void setUp() {
+        Handler handler = new Handler(loanUseCase, loanMapper, validator);
+
+        webTestClient = WebTestClient.bindToRouterFunction(
+                RouterFunctions.route()
+                        .POST("/api/v1/loan", handler::createLoan)
+                        .build()
+        ).build();
+
+        loanDTO = LoanDTO.builder()
+                .amount(new BigDecimal("2500.00"))
+                .loanTerm(12)
+                .email("test@email.com")
+                .dni("12345678")
+                .loanType("PERSONAL")
+                .build();
     }
 
     @Test
-    void testListenGETOtherUseCase() {
-        webTestClient.get()
-                .uri("/api/otherusercase/path")
-                .accept(MediaType.APPLICATION_JSON)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody(String.class)
-                .value(userResponse -> {
-                            Assertions.assertThat(userResponse).isEmpty();
-                        }
-                );
-    }
+    void givenValidLoanRequest_whenCreateLoan_thenReturnsCreated() {
 
-    @Test
-    void testListenPOSTUseCase() {
+        when(validator.validate(any(LoanDTO.class)))
+                .thenReturn(Mono.just(loanDTO));
+        when(loanMapper.toDomain(any(LoanDTO.class)))
+                .thenReturn(new com.creditya.loanservice.model.loan.Loan());
+        com.creditya.loanservice.model.loan.Loan savedLoan =
+                new com.creditya.loanservice.model.loan.Loan();
+        savedLoan.setLoanId(UUID.randomUUID());
+        when(loanUseCase.createLoan(any(), any()))
+                .thenReturn(Mono.just(savedLoan));
+
         webTestClient.post()
-                .uri("/api/usecase/otherpath")
-                .accept(MediaType.APPLICATION_JSON)
-                .bodyValue("")
+                .uri("/api/v1/loan")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(loanDTO)
                 .exchange()
-                .expectStatus().isOk()
+                .expectStatus().isCreated()
+                .expectBody().isEmpty();
+    }
+
+    @Test
+    void givenValidationFails_whenCreateLoan_thenReturnsBadRequest() {
+        BaseException validationException = new BaseException(
+                "VAL-001",
+                "Validation error",
+                "Invalid loan request",
+                400,
+                Map.of("amount", "must be greater than 0")
+        );
+
+        when(validator.validate(any(LoanDTO.class)))
+                .thenReturn(Mono.error(validationException));
+
+        webTestClient.post()
+                .uri("/api/v1/loan")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(loanDTO)
+                .exchange()
+                .expectStatus().isBadRequest()
                 .expectBody(String.class)
-                .value(userResponse -> {
-                            Assertions.assertThat(userResponse).isEmpty();
-                        }
-                );
+                .isEqualTo("Invalid loan request");
+    }
+
+
+    @Test
+    void givenUnexpectedError_whenCreateLoan_thenReturnsInternalServerError() {
+        when(validator.validate(any(LoanDTO.class)))
+                .thenReturn(Mono.just(loanDTO));
+        when(loanMapper.toDomain(any(LoanDTO.class)))
+                .thenReturn(new com.creditya.loanservice.model.loan.Loan());
+        when(loanUseCase.createLoan(any(), any()))
+                .thenReturn(Mono.error(new RuntimeException("DB down")));
+
+        webTestClient.post()
+                .uri("/api/v1/loan")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(loanDTO)
+                .exchange()
+                .expectStatus().is5xxServerError()
+                .expectBody(String.class)
+                .isEqualTo("Unexpected error: DB down");
     }
 }

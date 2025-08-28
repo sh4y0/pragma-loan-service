@@ -1,7 +1,7 @@
 package com.creditya.loanservice.api;
 
 import com.creditya.loanservice.api.dto.request.LoanDTO;
-import com.creditya.loanservice.api.exception.GlobalExceptionHandler;
+import com.creditya.loanservice.api.exception.GlobalExceptionFilter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -61,7 +61,7 @@ public class RouterRest {
                     )
             )
     })
-    public RouterFunction<ServerResponse> routerFunction(Handler handler, GlobalExceptionHandler globalExceptionHandler) {
+    public RouterFunction<ServerResponse> routerFunction(Handler handler, GlobalExceptionFilter globalExceptionHandler) {
         return route(POST("/api/v1/loan"), handler::createLoan)
                 .filter(globalExceptionHandler);
     }
