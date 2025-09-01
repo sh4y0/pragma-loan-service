@@ -1,11 +1,9 @@
 package com.creditya.loanservice.api;
 
-import com.creditya.loanservice.api.dto.request.LoanDTO;
+import com.creditya.loanservice.api.dto.request.LoanCreatedRequestDTO;
 import com.creditya.loanservice.api.exception.service.ValidationService;
-import com.creditya.loanservice.api.mapper.LoanMapper;
+import com.creditya.loanservice.api.facade.SecureLoanFacade;
 import com.creditya.loanservice.model.loan.Loan;
-import com.creditya.loanservice.model.utils.gateways.UseCaseLogger;
-import com.creditya.loanservice.usecase.LoanUseCase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,16 +23,14 @@ import static org.mockito.Mockito.*;
 
 class HandlerRestTest {
 
-    @Mock
-    private LoanMapper mapper;
+    @Mock private LoanMapper mapper;
     @Mock private ValidationService validator;
-    @Mock private LoanUseCase loanUseCase;
+    @Mock private SecureLoanFacade loanUseCase;
     @Mock private ServerRequest serverRequest;
-    @Mock private UseCaseLogger useCaseLogger;
 
     private Handler handler;
 
-    private LoanDTO loanDTO;
+    private LoanCreatedRequestDTO loanDTO;
     private Loan domain;
 
     private AutoCloseable mocks;
@@ -43,7 +39,7 @@ class HandlerRestTest {
     void setUp() {
         mocks = MockitoAnnotations.openMocks(this);
 
-        loanDTO = new LoanDTO(
+        loanDTO = new LoanCreatedRequestDTO(
                 new BigDecimal("10000.00"),
                 12,
                 "test@example.com",
@@ -61,9 +57,9 @@ class HandlerRestTest {
 
 
 
-        when(serverRequest.bodyToMono(LoanDTO.class)).thenReturn(Mono.empty());
-        when(validator.validate(any(LoanDTO.class))).thenReturn(Mono.just(loanDTO));
-        when(mapper.toDomain(loanDTO)).thenReturn(domain);
+        when(serverRequest.bodyToMono(LoanCreatedRequestDTO.class)).thenReturn(Mono.empty());
+        when(validator.validate(any(LoanCreatedRequestDTO.class))).thenReturn(Mono.just(loanDTO));
+        when(mapper.toLoan(loanDTO)).thenReturn(domain);
 
         handler = new Handler(loanUseCase, mapper, validator);
     }
@@ -76,7 +72,7 @@ class HandlerRestTest {
     @Test
     @DisplayName("Should handle POST /loan and return ServerResponse with created LoanApplication")
     void testListenPOSTCreateLoanApplicationUseCase() {
-        when(serverRequest.bodyToMono(LoanDTO.class)).thenReturn(Mono.just(loanDTO));
+        when(serverRequest.bodyToMono(LoanCreatedRequestDTO.class)).thenReturn(Mono.just(loanDTO));
 
         Mono<ServerResponse> result = handler.createLoan(serverRequest);
 
@@ -84,7 +80,7 @@ class HandlerRestTest {
                 .expectNextMatches(ServerResponse.class::isInstance)
                 .verifyComplete();
 
-        verify(loanUseCase, times(1)).createLoan(domain, "Préstamo Personal");
+        verify(loanUseCase, times(1)).createLoan(domain, "PERSONAL");
     }
 
     @Test

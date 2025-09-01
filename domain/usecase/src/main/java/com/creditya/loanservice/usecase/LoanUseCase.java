@@ -2,6 +2,7 @@
 package com.creditya.loanservice.usecase;
 
 import com.creditya.loanservice.model.loan.Loan;
+import com.creditya.loanservice.model.loan.data.LoanData;
 import com.creditya.loanservice.model.loan.gateways.LoanRepository;
 import com.creditya.loanservice.model.loanstatus.gateways.LoanStatusRepository;
 import com.creditya.loanservice.model.loantype.gateways.LoanTypeRepository;
@@ -24,7 +25,7 @@ public class LoanUseCase {
     private final UseCaseLogger logger;
     private final TransactionalGateway transactionalGateway;
 
-    public Mono<Loan> createLoan(Loan loan, String loanTypeName) {
+    public Mono<LoanData> createLoan(Loan loan, String loanTypeName) {
         logger.trace("Starting loan creation flow for DNI: {}", loan.getDni());
 
         return transactionalGateway.executeInTransaction(
@@ -59,7 +60,16 @@ public class LoanUseCase {
                                                 loan.setIdStatus(status.getIdStatus());
                                                 logger.trace("Assigned status ID {} to loan application for DNI: {}", status.getIdStatus(), loan.getDni());
                                                 return loanRepository.createLoan(loan)
-                                                        .doOnSuccess(app -> logger.info("Loan application created successfully for DNI: {}", app.getDni()));
+                                                        .doOnSuccess(app -> logger.info("Loan application created successfully for DNI: {}", app.getDni()))
+                                                        .map(loanSaved -> LoanData.builder()
+                                                                .loanId(loanSaved.getLoanId())
+                                                                .amount(loanSaved.getAmount())
+                                                                .loanTerm(loanSaved.getLoanTerm())
+                                                                .email(loanSaved.getEmail())
+                                                                .dni(loanSaved.getDni())
+                                                                .status(status.getName())
+                                                                .loanType(type.getName())
+                                                                .build());
                                             });
                                 })
                 )

@@ -26,4 +26,6 @@ public class LoanEntity {
     private UUID idStatus;
     @Column("id_loan_type")
     private UUID idLoanType;
+    @Column("user_id")
+    private UUID userId;
 }

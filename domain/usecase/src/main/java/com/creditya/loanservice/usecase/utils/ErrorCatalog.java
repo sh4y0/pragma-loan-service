@@ -9,6 +9,14 @@ import java.util.Map;
 @AllArgsConstructor
 public enum ErrorCatalog {
 
+    UNAUTHORIZED(
+            "UNAUTHORIZED",
+            "Unauthorized",
+            "You are not authorized to access this resource. Please provide a valid token or log in.",
+            401,
+            Map.of("auth", "Unauthorized access - missing or invalid authentication credentials")
+    ),
+
     LOAN_TYPE_NOT_FOUND(
             "LOAN_TPE_NOT_FOUND",
             "Loan type Not Found",

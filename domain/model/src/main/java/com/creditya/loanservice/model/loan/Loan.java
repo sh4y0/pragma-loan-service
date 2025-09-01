@@ -21,5 +21,6 @@ public class Loan {
     private String dni;
     private UUID idStatus;
     private UUID idLoanType;
+    private UUID userId;
 
 }

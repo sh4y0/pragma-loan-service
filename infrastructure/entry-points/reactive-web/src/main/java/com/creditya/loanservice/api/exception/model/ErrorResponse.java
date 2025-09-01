@@ -1,5 +1,6 @@
 package com.creditya.loanservice.api.exception.model;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -12,6 +13,7 @@ public class ErrorResponse {
     private String tittle;
     private String message;
     private int status;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd hh:mm:ss a")
     private LocalDateTime timestamp;
     private Object errors;
 }

@@ -1,6 +1,6 @@
 package com.creditya.loanservice.api;
 
-import com.creditya.loanservice.api.dto.request.LoanDTO;
+import com.creditya.loanservice.api.dto.request.LoanCreatedRequestDTO;
 import com.creditya.loanservice.api.exception.GlobalExceptionFilter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
+import static org.springframework.web.reactive.function.server.RequestPredicates.GET;
 import static org.springframework.web.reactive.function.server.RequestPredicates.POST;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
@@ -33,7 +34,7 @@ public class RouterRest {
                                     required = true,
                                     content = @Content(
                                             mediaType = "application/json",
-                                            schema = @Schema(implementation = LoanDTO.class)
+                                            schema = @Schema(implementation = LoanCreatedRequestDTO.class)
                                     )
                             ),
                             responses = {
@@ -63,6 +64,7 @@ public class RouterRest {
     })
     public RouterFunction<ServerResponse> routerFunction(Handler handler, GlobalExceptionFilter globalExceptionHandler) {
         return route(POST("/api/v1/loan"), handler::createLoan)
+                .andRoute(GET("/api/v1/loan"), handler::getLoans)
                 .filter(globalExceptionHandler);
     }
 }
