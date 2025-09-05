@@ -1,13 +1,10 @@
 package com.creditya.loanservice.api.config;
 
-import com.creditya.loanservice.api.Handler;
-import com.creditya.loanservice.api.RouterRest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.function.server.RouterFunction;
@@ -18,7 +15,8 @@ import static org.springframework.web.reactive.function.server.RouterFunctions.r
 
 @ContextConfiguration(classes = { CorsConfig.class,
         SecurityHeadersConfig.class,
-        ConfigTest.TestRouter.class})
+        ConfigTest.TestRouter.class,
+        TestSecurityConfig.class})
 @WebFluxTest
 class ConfigTest {
 

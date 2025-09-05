@@ -9,13 +9,52 @@ import java.util.Map;
 @AllArgsConstructor
 public enum ErrorCatalog {
 
+    PAGE_INDEX_NEGATIVE(
+            "APPLICATIONS_PAGE_INDEX_NEGATIVE",
+            "Page Index Negative",
+            "The page index cannot be negative.",
+            400,
+            Map.of(
+                    "page", "Page number must be zero or greater"
+            )
+    ),
+
+    PAGE_SIZE_INVALID(
+            "APPLICATIONS_PAGE_SIZE_INVALID",
+            "Invalid Page Size",
+            "The page size must be greater than zero.",
+            400,
+            Map.of(
+                    "size", "Page size must be a positive number"
+            )
+    ),
+
+    DNI_MISMATCH(
+            "APPLICATIONS_DNI_MISMATCH",
+            "DNI Mismatch",
+            "The DNI in the request does not match the authenticated user's DNI.",
+            403,
+            Map.of(
+                    "dni", "The DNI provided does not belong to the authenticated user"
+            )
+    ),
+
+    FORBIDDEN(
+            "FORBIDDEN",
+            "Forbidden",
+            "You do not have permission to access this resource.",
+            403,
+            Map.of("auth", "Access denied - insufficient permissions")
+    ),
+
     UNAUTHORIZED(
             "UNAUTHORIZED",
             "Unauthorized",
-            "You are not authorized to access this resource. Please provide a valid token or log in.",
+            "Authentication failed. Please provide a valid token.",
             401,
-            Map.of("auth", "Unauthorized access - missing or invalid authentication credentials")
+            Map.of("auth", "Missing, invalid, or expired authentication token")
     ),
+
 
     LOAN_TYPE_NOT_FOUND(
             "LOAN_TPE_NOT_FOUND",

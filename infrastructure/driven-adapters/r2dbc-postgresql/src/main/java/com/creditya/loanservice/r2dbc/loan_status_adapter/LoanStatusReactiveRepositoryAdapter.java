@@ -2,6 +2,7 @@ package com.creditya.loanservice.r2dbc.loan_status_adapter;
 
 import com.creditya.loanservice.model.loanstatus.LoanStatus;
 import com.creditya.loanservice.model.loanstatus.gateways.LoanStatusRepository;
+import com.creditya.loanservice.model.loantype.LoanType;
 import com.creditya.loanservice.r2dbc.entity.LoanStatusEntity;
 import com.creditya.loanservice.r2dbc.helper.ReactiveAdapterOperations;
 import org.reactivecommons.utils.ObjectMapper;
@@ -32,5 +33,11 @@ public class LoanStatusReactiveRepositoryAdapter extends ReactiveAdapterOperatio
     @Override
     public Flux<UUID> findIdsByNames(List<String> statusNames) {
         return this.repository.findByNameIn(statusNames).map(LoanStatusEntity::getIdStatus);
+    }
+
+    @Override
+    public Flux<LoanStatus> findByIds(List<UUID> uuids) {
+        return this.repository.findAllById(uuids)
+                .map(this::toEntity);
     }
 }

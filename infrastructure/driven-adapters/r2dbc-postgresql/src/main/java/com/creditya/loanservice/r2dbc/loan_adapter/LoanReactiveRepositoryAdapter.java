@@ -36,6 +36,16 @@ public class LoanReactiveRepositoryAdapter extends ReactiveAdapterOperations<
     }
 
     @Override
+    public Mono<Long> countAllLoans() {
+        return this.repository.count();
+    }
+
+    @Override
+    public Flux<Loan> findAllLoans() {
+        return this.repository.findAll().map(this::toEntity);
+    }
+
+    @Override
     public Mono<Long> countLoansByStatusIds(List<UUID> statusIds) {
         return this.repository.countByIdStatusIn(statusIds);
     }

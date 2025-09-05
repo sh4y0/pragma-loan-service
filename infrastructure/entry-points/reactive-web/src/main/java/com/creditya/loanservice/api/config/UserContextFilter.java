@@ -20,12 +20,13 @@ public class UserContextFilter implements WebFilter {
                 .cast(JwtAuthenticationToken.class)
                 .flatMap(authToken -> {
                     String userId = authToken.getToken().getClaimAsString("userId");
+                    String userDni = authToken.getToken().getClaimAsString("userDni");
                     if (userId == null) {
                         return Mono.error(new UnauthorizedException("Missing userId claim"));
                     }
 
                     return chain.filter(exchange)
-                            .contextWrite(Context.of("userId", userId));
+                            .contextWrite(Context.of("userId", userId, "userDni", userDni));
                 });
     }
 }

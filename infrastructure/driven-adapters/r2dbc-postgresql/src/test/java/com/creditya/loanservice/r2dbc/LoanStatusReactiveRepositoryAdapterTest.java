@@ -1,24 +1,28 @@
 package com.creditya.loanservice.r2dbc;
 
+import com.creditya.loanservice.model.loanstatus.LoanStatus;
+import com.creditya.loanservice.r2dbc.entity.LoanStatusEntity;
 import com.creditya.loanservice.r2dbc.loan_status_adapter.LoanStatusReactiveRepository;
 import com.creditya.loanservice.r2dbc.loan_status_adapter.LoanStatusReactiveRepositoryAdapter;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.reactivecommons.utils.ObjectMapper;
-import org.springframework.data.domain.Example;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import java.util.List;
+import java.util.UUID;
+
+import static org.mockito.Mockito.*;
+
+import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(MockitoExtension.class)
 class LoanStatusReactiveRepositoryAdapterTest {
-    // TODO: change four you own tests
 
     @InjectMocks
     LoanStatusReactiveRepositoryAdapter repositoryAdapter;
@@ -29,52 +33,99 @@ class LoanStatusReactiveRepositoryAdapterTest {
     @Mock
     ObjectMapper mapper;
 
-    @Test
-    void mustFindValueById() {
+    private UUID statusId;
+    private LoanStatus loanStatus;
+    private LoanStatusEntity loanStatusEntity;
 
-        when(repository.findById("1")).thenReturn(Mono.just("test"));
-        when(mapper.map("test", Object.class)).thenReturn("test");
+    @BeforeEach
+    void setUp() {
+        statusId = UUID.randomUUID();
 
-        Mono<Object> result = repositoryAdapter.findById("1");
+        loanStatus = new LoanStatus();
+        loanStatus.setIdStatus(statusId);
+        loanStatus.setName("PENDING");
 
-        StepVerifier.create(result)
-                .expectNextMatches(value -> value.equals("test"))
-                .verifyComplete();
+        loanStatusEntity = new LoanStatusEntity();
+        loanStatusEntity.setIdStatus(statusId);
+        loanStatusEntity.setName("PENDING");
     }
 
     @Test
-    void mustFindAllValues() {
-        when(repository.findAll()).thenReturn(Flux.just("test"));
-        when(mapper.map("test", Object.class)).thenReturn("test");
+    void findByName_success() {
+        when(repository.findByName("PENDING")).thenReturn(Mono.just(loanStatusEntity));
+        when(mapper.map(loanStatusEntity, LoanStatus.class)).thenReturn(loanStatus);
 
-        Flux<Object> result = repositoryAdapter.findAll();
+        Mono<LoanStatus> result = repositoryAdapter.findByName("PENDING");
 
         StepVerifier.create(result)
-                .expectNextMatches(value -> value.equals("test"))
+                .expectNextMatches(l -> l.getIdStatus().equals(statusId) && l.getName().equals("PENDING"))
                 .verifyComplete();
+
+        verify(repository, times(1)).findByName("PENDING");
     }
 
     @Test
-    void mustFindByExample() {
-        when(repository.findAll(any(Example.class))).thenReturn(Flux.just("test"));
-        when(mapper.map("test", Object.class)).thenReturn("test");
+    void findByIds_success() {
+        List<UUID> ids = List.of(statusId);
 
-        Flux<Object> result = repositoryAdapter.findByExample("test");
+        when(repository.findAllById(ids)).thenReturn(Flux.just(loanStatusEntity));
+        when(mapper.map(loanStatusEntity, LoanStatus.class)).thenReturn(loanStatus);
+
+        Flux<LoanStatus> result = repositoryAdapter.findByIds(ids);
 
         StepVerifier.create(result)
-                .expectNextMatches(value -> value.equals("test"))
+                .expectNextMatches(l -> l.getIdStatus().equals(statusId) && l.getName().equals("PENDING"))
                 .verifyComplete();
+
+        verify(repository, times(1)).findAllById(ids);
     }
 
     @Test
-    void mustSaveValue() {
-        when(repository.save("test")).thenReturn(Mono.just("test"));
-        when(mapper.map("test", Object.class)).thenReturn("test");
+    void findByIds_emptyList() {
+        List<UUID> ids = List.of();
 
-        Mono<Object> result = repositoryAdapter.save("test");
+        when(repository.findAllById(ids)).thenReturn(Flux.empty());
+
+        StepVerifier.create(repositoryAdapter.findByIds(ids))
+                .verifyComplete();
+
+        verify(repository, times(1)).findAllById(ids);
+    }
+
+    @Test
+    void findIdsByNames_success() {
+        List<String> names = List.of("PENDING");
+
+        when(repository.findByNameIn(names)).thenReturn(Flux.just(loanStatusEntity));
+
+        Flux<UUID> result = repositoryAdapter.findIdsByNames(names);
 
         StepVerifier.create(result)
-                .expectNextMatches(value -> value.equals("test"))
+                .expectNextMatches(id -> id.equals(statusId))
                 .verifyComplete();
+
+        verify(repository, times(1)).findByNameIn(names);
+    }
+
+    @Test
+    void findByName_notFound() {
+        when(repository.findByName("UNKNOWN")).thenReturn(Mono.empty());
+
+        StepVerifier.create(repositoryAdapter.findByName("UNKNOWN"))
+                .verifyComplete();
+
+        verify(repository, times(1)).findByName("UNKNOWN");
+    }
+
+    @Test
+    void findIdsByNames_emptyList() {
+        List<String> names = List.of();
+
+        when(repository.findByNameIn(names)).thenReturn(Flux.empty());
+
+        StepVerifier.create(repositoryAdapter.findIdsByNames(names))
+                .verifyComplete();
+
+        verify(repository, times(1)).findByNameIn(names);
     }
 }

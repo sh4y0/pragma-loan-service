@@ -16,6 +16,6 @@ public record LoanResponseDTO(
 
         BigDecimal interestRate,
         BigDecimal totalMontlyDebt,
-        Integer approvedLoans
+        Long approvedLoans
 ) {}
 

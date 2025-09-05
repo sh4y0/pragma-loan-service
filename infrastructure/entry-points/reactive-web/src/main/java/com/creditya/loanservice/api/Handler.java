@@ -5,10 +5,10 @@ import com.creditya.loanservice.api.dto.request.LoanCreatedRequestDTO;
 import com.creditya.loanservice.api.dto.response.LoanResponseDTO;
 import com.creditya.loanservice.api.exception.model.UnexpectedException;
 import com.creditya.loanservice.api.exception.service.ValidationService;
-import com.creditya.loanservice.api.facade.SecureLoanFacade;
 import com.creditya.loanservice.api.mapper.LoanMapper;
-import com.creditya.loanservice.model.PageResponse;
-import com.creditya.loanservice.usecase.GetLoanUnderReviewUseCase;
+import com.creditya.loanservice.model.Page;
+import com.creditya.loanservice.usecase.GetPaginationLoanUseCase;
+import com.creditya.loanservice.usecase.LoanUseCase;
 import com.creditya.loanservice.usecase.exception.BaseException;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import lombok.RequiredArgsConstructor;
@@ -20,30 +20,23 @@ import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 
-import java.util.UUID;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
 public class Handler {
-    private final SecureLoanFacade secureLoanFacade;
+    private final LoanUseCase loanUseCase;
     private final LoanMapper loanMapper;
     private final ValidationService validator;
-    private final GetLoanUnderReviewUseCase getLoanUnderReviewUseCase;
+    private final GetPaginationLoanUseCase getPaginationLoanUseCase;
 
-    @PreAuthorize("hasAuthority('ROLE_CUSTOMER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_ADVISER')")
     public Mono<ServerResponse> createLoan(ServerRequest serverRequest) {
         return serverRequest.bodyToMono(LoanCreatedRequestDTO.class)
                 .flatMap(validator::validate)
-                .flatMap(loanDto ->
-                        Mono.deferContextual(ctx -> {
-                            String userId = ctx.get("userId");
-                            var loanDomain = loanMapper.toLoan(loanDto);
-                            loanDomain.setUserId(UUID.fromString(userId));
-
-                            return secureLoanFacade.createLoan(loanDomain, loanDto.loanType());
-                        })
+                .flatMap(loanDto -> loanUseCase.createLoan(loanMapper.toLoan(loanDto), loanDto.loanType())
                 )
-                .map(loanMapper::toLoanResponseDTO)
+                .map(loanMapper::toLoanCreateResponseDTO)
                 .flatMap(response ->
                         ServerResponse.status(HttpStatus.CREATED)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -53,23 +46,26 @@ public class Handler {
                 ));
     }
 
-    @PreAuthorize("hasAuthority('ROLE_ADVISER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_ADVISER')")
     public Mono<ServerResponse> getLoans(ServerRequest request) {
         int page = Integer.parseInt(request.queryParam("page").orElse("0"));
         int size = Integer.parseInt(request.queryParam("size").orElse("10"));
 
-        return getLoanUnderReviewUseCase.execute(page, size)
-                .map(pageResponse -> PageResponse.<LoanResponseDTO>builder()
-                        .page(pageResponse.getPage())
-                        .size(pageResponse.getSize())
-                        .totalElements(pageResponse.getTotalElements())
-                        .totalPages(pageResponse.getTotalPages())
-                        .content(
-                                pageResponse.getContent().stream()
-                                        .map(loanMapper::toLoanResponseDTO)
-                                        .toList()
-                        )
-                        .build()
+        List<String> filterStatuses = request.queryParams().getOrDefault("status", List.of());
+
+        return getPaginationLoanUseCase.execute(page, size, filterStatuses)
+                .map(pageResponse ->
+                        Page.<LoanResponseDTO>builder()
+                                .page(pageResponse.getPage())
+                                .size(pageResponse.getSize())
+                                .totalElements(pageResponse.getTotalElements())
+                                .totalPages(pageResponse.getTotalPages())
+                                .content(
+                                        pageResponse.getContent().stream()
+                                                .map(loanMapper::toLoanCreateResponseDTO)
+                                                .toList()
+                                )
+                                .build()
                 )
                 .flatMap(dtoPage ->
                         ServerResponse.ok()
@@ -77,8 +73,6 @@ public class Handler {
                                 .bodyValue(dtoPage)
                 );
     }
-
-
 
     public Mono<Void> createLoanDoc(@RequestBody(description = "Request - for Loan")
                                     LoanCreatedRequestDTO dto) {

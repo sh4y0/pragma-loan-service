@@ -1,13 +1,27 @@
 package com.creditya.loanservice.config;
 
+import com.creditya.loanservice.model.loan.gateways.LoanRepository;
+import com.creditya.loanservice.model.loanstatus.gateways.LoanStatusRepository;
+import com.creditya.loanservice.model.loantype.gateways.LoanTypeRepository;
+import com.creditya.loanservice.model.usersnapshot.gateways.UserSnapshotRepository;
+import com.creditya.loanservice.model.utils.gateways.TransactionalGateway;
+import com.creditya.loanservice.model.utils.gateways.UseCaseLogger;
+import com.creditya.loanservice.usecase.GetPaginationLoanUseCase;
+import com.creditya.loanservice.usecase.LoanUseCase;
+import com.creditya.loanservice.usecase.utils.LoanCalculator;
+import com.creditya.loanservice.usecase.utils.LoanStatus;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class UseCasesConfigTest {
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+
+class UseCasesConfigTest {
 
     @Test
     void testUseCaseBeansExist() {
@@ -26,19 +40,81 @@ public class UseCasesConfigTest {
         }
     }
 
-    @Configuration
-    @Import(UseCasesConfig.class)
-    static class TestConfig {
+    @Test
+    @DisplayName("Should register LoanUseCase bean in application context")
+    void testLoanUseCaseBeanExists() {
+        try (AnnotationConfigApplicationContext context =
+                     new AnnotationConfigApplicationContext(TestConfig.class)) {
 
-        @Bean
-        public MyUseCase myUseCase() {
-            return new MyUseCase();
+            LoanUseCase loanUseCase = context.getBean(LoanUseCase.class);
+            assertNotNull(loanUseCase, "LoanUseCase bean should be registered");
         }
     }
 
-    static class MyUseCase {
-        public String execute() {
-            return "MyUseCase Test";
+    @Test
+    @DisplayName("Should register GetLoanUnderReviewUseCase bean in application context")
+    void testGetLoanUnderReviewUseCaseBeanExists() {
+        try (AnnotationConfigApplicationContext context =
+                     new AnnotationConfigApplicationContext(TestConfig.class)) {
+
+            GetPaginationLoanUseCase useCase = context.getBean(GetPaginationLoanUseCase.class);
+            assertNotNull(useCase, "GetLoanUnderReviewUseCase bean should be registered");
         }
+    }
+
+    @Test
+    @DisplayName("Should register LoanStatus and LoanCalculator utility beans")
+    void testUtilityBeansExist() {
+        try (AnnotationConfigApplicationContext context =
+                     new AnnotationConfigApplicationContext(TestConfig.class)) {
+
+            LoanStatus status = context.getBean(LoanStatus.class);
+            LoanCalculator calculator = context.getBean(LoanCalculator.class);
+
+            assertNotNull(status, "LoanStatus bean should be registered");
+            assertNotNull(calculator, "LoanCalculator bean should be registered");
+        }
+    }
+
+    @Configuration
+    @Import(UseCasesConfig.class)
+    static class TestConfig {
+        @Bean
+        public LoanRepository loanRepository() {
+            return mock(LoanRepository.class);
+        }
+
+        @Bean
+        public LoanStatusRepository loanStatusRepository() {
+            return mock(LoanStatusRepository.class);
+        }
+
+        @Bean
+        public UserSnapshotRepository userSnapshotRepository() {
+            return mock(UserSnapshotRepository.class);
+        }
+
+        @Bean
+        public LoanTypeRepository loanTypeRepository() {
+            return mock(LoanTypeRepository.class);
+        }
+
+        @Bean
+        public LoanCalculator loanCalculator() {
+            return mock(LoanCalculator.class);
+        }
+
+        @Bean
+        public UseCaseLogger logger() {
+            return mock(UseCaseLogger.class);
+        }
+
+        @Bean
+        public TransactionalGateway transactionalGateway() {
+            return mock(TransactionalGateway.class);
+        }
+
+
+
     }
 }

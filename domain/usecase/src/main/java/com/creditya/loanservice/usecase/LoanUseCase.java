@@ -11,8 +11,11 @@ import com.creditya.loanservice.model.utils.gateways.UseCaseLogger;
 import com.creditya.loanservice.usecase.exception.LoanAmountOutOfRangeException;
 import com.creditya.loanservice.usecase.exception.LoanStatusNotFoundException;
 import com.creditya.loanservice.usecase.exception.LoanTypeNotFoundException;
+import com.creditya.loanservice.usecase.exception.UnauthorizedLoanApplicationException;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Mono;
+
+import java.util.UUID;
 
 import static com.creditya.loanservice.model.loanstatus.Status.PENDING;
 
@@ -26,54 +29,63 @@ public class LoanUseCase {
     private final TransactionalGateway transactionalGateway;
 
     public Mono<LoanData> createLoan(Loan loan, String loanTypeName) {
-        logger.trace("Starting loan creation flow for DNI: {}", loan.getDni());
+        return Mono.deferContextual(context -> {
+            String userId = context.get("userId");
+            String dni = context.get("userDni");
 
-        return transactionalGateway.executeInTransaction(
-                        loanTypeRepository.findByName(loanTypeName)
-                                .doOnNext(type -> logger.trace("Loan type found: {} (ID: {})", type.getName(), type.getIdLoanType()))
-                                .switchIfEmpty(Mono.defer(() -> {
-                                    logger.warn("Loan type not found: {}", loanTypeName);
-                                    return Mono.error(new LoanTypeNotFoundException());
-                                }))
-                                .filter(type -> {
-                                    boolean inRange = loan.getAmount().compareTo(type.getMinimumAmount()) >= 0 &&
-                                            loan.getAmount().compareTo(type.getMaximumAmount()) <= 0;
-                                    if (!inRange) {
-                                        logger.warn("Loan amount {} is out of range for loan type {}",
-                                                loan.getAmount(), loanTypeName);
-                                    }
-                                    return inRange;
-                                })
-                                .switchIfEmpty(Mono.error(new LoanAmountOutOfRangeException()))
-                                .flatMap(type -> {
-                                    loan.setIdLoanType(type.getIdLoanType());
-                                    logger.trace("Assigned loan type ID {} to loan application for DNI: {}", type.getIdLoanType(), loan.getDni());
+            if (!loan.getDni().equals(dni)) {
+                return Mono.error(new UnauthorizedLoanApplicationException());
+            }
 
-                                    return loanStatusRepository.findByName(PENDING.getName())
-                                            .doOnNext(status -> logger.trace("Initial loan status found: {} (ID: {})",
-                                                    PENDING.getName(), status.getIdStatus()))
-                                            .switchIfEmpty(Mono.defer(() -> {
-                                                logger.error("Initial loan status '{}' not found", PENDING.getName());
-                                                return Mono.error(new LoanStatusNotFoundException());
-                                            }))
-                                            .flatMap(status -> {
-                                                loan.setIdStatus(status.getIdStatus());
-                                                logger.trace("Assigned status ID {} to loan application for DNI: {}", status.getIdStatus(), loan.getDni());
-                                                return loanRepository.createLoan(loan)
-                                                        .doOnSuccess(app -> logger.info("Loan application created successfully for DNI: {}", app.getDni()))
-                                                        .map(loanSaved -> LoanData.builder()
-                                                                .loanId(loanSaved.getLoanId())
-                                                                .amount(loanSaved.getAmount())
-                                                                .loanTerm(loanSaved.getLoanTerm())
-                                                                .email(loanSaved.getEmail())
-                                                                .dni(loanSaved.getDni())
-                                                                .status(status.getName())
-                                                                .loanType(type.getName())
-                                                                .build());
-                                            });
-                                })
-                )
-                .doOnError(err -> logger.error("Error creating loan application for DNI {}: {}",
-                        loan.getDni(), err.getMessage()));
+            logger.trace("Starting loan creation flow for DNI: {} (userId: {})", loan.getDni(), userId);
+
+            return transactionalGateway.executeInTransaction(
+                    loanTypeRepository.findByName(loanTypeName)
+                            .doOnNext(type -> logger.trace("Loan type found: {} (ID: {})", type.getName(), type.getIdLoanType()))
+                            .switchIfEmpty(Mono.defer(() -> {
+                                logger.warn("Loan type not found: {}", loanTypeName);
+                                return Mono.error(new LoanTypeNotFoundException());
+                            }))
+                            .filter(type -> {
+                                boolean inRange = loan.getAmount().compareTo(type.getMinimumAmount()) >= 0 &&
+                                        loan.getAmount().compareTo(type.getMaximumAmount()) <= 0;
+                                if (!inRange) {
+                                    logger.warn("Loan amount {} is out of range for loan type {}",
+                                            loan.getAmount(), loanTypeName);
+                                }
+                                return inRange;
+                            })
+                            .switchIfEmpty(Mono.error(new LoanAmountOutOfRangeException()))
+                            .flatMap(type -> {
+                                loan.setIdLoanType(type.getIdLoanType());
+                                logger.trace("Assigned loan type ID {} to loan application for DNI: {}", type.getIdLoanType(), loan.getDni());
+
+                                return loanStatusRepository.findByName(PENDING.getName())
+                                        .doOnNext(status -> logger.trace("Initial loan status found: {} (ID: {})",
+                                                PENDING.getName(), status.getIdStatus()))
+                                        .switchIfEmpty(Mono.defer(() -> {
+                                            logger.error("Initial loan status '{}' not found", PENDING.getName());
+                                            return Mono.error(new LoanStatusNotFoundException());
+                                        }))
+                                        .flatMap(status -> {
+                                            loan.setUserId(UUID.fromString(userId));
+                                            loan.setIdStatus(status.getIdStatus());
+                                            logger.trace("Assigned status ID {} to loan application for DNI: {}", status.getIdStatus(), loan.getDni());
+                                            return loanRepository.createLoan(loan)
+                                                    .doOnSuccess(app -> logger.info("Loan application created successfully for DNI: {}", app.getDni()))
+                                                    .map(loanSaved -> LoanData.builder()
+                                                            .loanId(loanSaved.getLoanId())
+                                                            .amount(loanSaved.getAmount())
+                                                            .loanTerm(loanSaved.getLoanTerm())
+                                                            .email(loanSaved.getEmail())
+                                                            .dni(loanSaved.getDni())
+                                                            .status(status.getName())
+                                                            .loanType(type.getName())
+                                                            .build());
+                                        });
+                            })
+            );
+        }).doOnError(err -> logger.error("Error creating loan application for DNI {}: {}", loan.getDni(), err.getMessage()));
     }
+
 }

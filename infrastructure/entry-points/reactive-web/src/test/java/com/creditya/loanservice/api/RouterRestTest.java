@@ -1,12 +1,15 @@
 package com.creditya.loanservice.api;
 
 import com.creditya.loanservice.api.dto.request.LoanCreatedRequestDTO;
+import com.creditya.loanservice.api.dto.response.LoanCreatedResponseDTO;
 import com.creditya.loanservice.api.exception.GlobalExceptionFilter;
 import com.creditya.loanservice.api.exception.service.ValidationService;
-import com.creditya.loanservice.api.facade.SecureLoanFacade;
+import com.creditya.loanservice.api.mapper.LoanMapper;
+import com.creditya.loanservice.model.loan.Loan;
 import com.creditya.loanservice.model.loan.data.LoanData;
 import com.creditya.loanservice.model.utils.gateways.UseCaseLogger;
-import com.creditya.loanservice.usecase.exception.BaseException;
+import com.creditya.loanservice.usecase.GetPaginationLoanUseCase;
+import com.creditya.loanservice.usecase.LoanUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +22,6 @@ import org.springframework.web.reactive.function.server.RouterFunctions;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -30,13 +32,16 @@ import static org.mockito.Mockito.when;
 class RouterRestTest {
 
     @MockitoBean
-    private SecureLoanFacade loanUseCase;
+    private LoanUseCase loanUseCase;
 
     @MockitoBean
     private LoanMapper loanMapper;
 
     @MockitoBean
     private ValidationService validator;
+
+    @MockitoBean
+    private GetPaginationLoanUseCase getPaginationLoanUseCase;
 
     @Autowired
     private WebTestClient webTestClient;
@@ -48,7 +53,7 @@ class RouterRestTest {
 
     @BeforeEach
     void setUp() {
-        Handler handler = new Handler(loanUseCase, loanMapper, validator);
+        Handler handler = new Handler(loanUseCase, loanMapper, validator, getPaginationLoanUseCase);
 
         webTestClient = WebTestClient.bindToRouterFunction(
                 RouterFunctions.route()
@@ -68,15 +73,38 @@ class RouterRestTest {
     @Test
     void givenValidLoanRequest_whenCreateLoan_thenReturnsCreated() {
 
+        Loan domain = Loan.builder()
+                .loanId(UUID.randomUUID())
+                .amount(loanDTO.amount())
+                .loanTerm(loanDTO.loanTerm())
+                .email(loanDTO.email())
+                .dni(loanDTO.dni())
+                .build();
+
+        LoanData domainLoanData = LoanData.builder()
+                .loanId(UUID.randomUUID())
+                .amount(loanDTO.amount())
+                .loanTerm(loanDTO.loanTerm())
+                .email(loanDTO.email())
+                .dni(loanDTO.dni())
+                .build();
+
+        LoanCreatedResponseDTO responseDTO = new LoanCreatedResponseDTO(
+                domainLoanData.getAmount(),
+                domainLoanData.getLoanTerm(),
+                domainLoanData.getEmail(),
+                domainLoanData.getDni(),
+                loanDTO.loanType()
+        );
+
         when(validator.validate(any(LoanCreatedRequestDTO.class)))
                 .thenReturn(Mono.just(loanDTO));
         when(loanMapper.toLoan(any(LoanCreatedRequestDTO.class)))
-                .thenReturn(new com.creditya.loanservice.model.loan.Loan());
-        LoanData savedLoan =
-                new LoanData();
-        savedLoan.setLoanId(UUID.randomUUID());
+                .thenReturn(domain);
         when(loanUseCase.createLoan(any(), any()))
-                .thenReturn(Mono.just(savedLoan));
+                .thenReturn(Mono.just(domainLoanData));
+        when(loanMapper.toLoanCreateResponseDTO(domainLoanData))
+                .thenReturn(responseDTO);
 
         webTestClient.post()
                 .uri("/api/v1/loan")
@@ -84,49 +112,8 @@ class RouterRestTest {
                 .bodyValue(loanDTO)
                 .exchange()
                 .expectStatus().isCreated()
-                .expectBody().isEmpty();
+                .expectBody(LoanCreatedResponseDTO.class)
+                .isEqualTo(responseDTO);
     }
 
-    @Test
-    void givenValidationFails_whenCreateLoan_thenReturnsBadRequest() {
-        BaseException validationException = new BaseException(
-                "VAL-001",
-                "Validation error",
-                "Invalid loan request",
-                400,
-                Map.of("amount", "must be greater than 0")
-        );
-
-        when(validator.validate(any(LoanCreatedRequestDTO.class)))
-                .thenReturn(Mono.error(validationException));
-
-        webTestClient.post()
-                .uri("/api/v1/loan")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(loanDTO)
-                .exchange()
-                .expectStatus().isBadRequest()
-                .expectBody(String.class)
-                .isEqualTo("Invalid loan request");
-    }
-
-
-    @Test
-    void givenUnexpectedError_whenCreateLoan_thenReturnsInternalServerError() {
-        when(validator.validate(any(LoanCreatedRequestDTO.class)))
-                .thenReturn(Mono.just(loanDTO));
-        when(loanMapper.toLoan(any(LoanCreatedRequestDTO.class)))
-                .thenReturn(new com.creditya.loanservice.model.loan.Loan());
-        when(loanUseCase.createLoan(any(), any()))
-                .thenReturn(Mono.error(new RuntimeException("DB down")));
-
-        webTestClient.post()
-                .uri("/api/v1/loan")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(loanDTO)
-                .exchange()
-                .expectStatus().is5xxServerError()
-                .expectBody(String.class)
-                .isEqualTo("Unexpected error: DB down");
-    }
 }

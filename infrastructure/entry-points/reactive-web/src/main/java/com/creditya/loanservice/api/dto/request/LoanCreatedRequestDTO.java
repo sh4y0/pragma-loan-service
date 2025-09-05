@@ -27,9 +27,12 @@ public record LoanCreatedRequestDTO(@NotNull(message = "Amount cannot be null")
                       @Schema(description = "User's Email", example = "gutierrezherrada@gmail.com")
                       String email,
 
-                                    @NotBlank(message = "DNI cannot be blank")
-                      @Pattern(regexp = "\\d{8}", message = "DNI must contain exactly 8 digits")
-                      @Schema(description = "National ID (DNI) of the applicant", example = "12345678")
+                      @NotBlank(message = "DNI cannot be blank")
+                      @Pattern(
+                            regexp = "^[0-9]{8}[A-Za-z]$",
+                            message = "DNI must contain exactly 8 digits followed by a letter"
+                      )
+                      @Schema(description = "National ID (DNI) of the applicant", example = "12345678Z")
                       String dni,
 
                                     @NotBlank(message = "Loan Type cannot be blank")

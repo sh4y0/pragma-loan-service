@@ -29,7 +29,7 @@ public class LoanMapper {
         return loan.build();
     }
 
-    public LoanCreatedResponseDTO toLoanResponseDTO(LoanData loandData) {
+    public LoanCreatedResponseDTO toLoanCreateResponseDTO(LoanData loandData) {
         if ( loandData == null ) {
             return null;
         }
@@ -51,7 +51,7 @@ public class LoanMapper {
         return new LoanCreatedResponseDTO( amount, loanTerm, email, dni, loanType );
     }
 
-    public LoanResponseDTO toLoanResponseDTO(LoanWithUser loanWithUser) {
+    public LoanResponseDTO toLoanCreateResponseDTO(LoanWithUser loanWithUser) {
         Loan loan = loanWithUser.getLoan();
         UserSnapshot user = loanWithUser.getUserSnapshot();
 
@@ -59,11 +59,11 @@ public class LoanMapper {
                 .amount(loan.getAmount())
                 .loanTerm(loan.getLoanTerm())
                 .email(loan.getEmail())
-                .loanType(loan.getIdLoanType().toString())
-                .loanStatus(loan.getIdStatus().toString())
-                //.interestRate(loan.getTasaInteres())
-                //.totalMontlyDebt(loan.getDeudaTotalMensualSolicitudesAprobadas())
-                //.approvedLoans(loan.getApprovedLoans())
+                .loanType(loanWithUser.getLoanTypeName())
+                .loanStatus(loanWithUser.getLoanStatusName())
+                .interestRate(loanWithUser.getInterestRate())
+                .totalMontlyDebt(loanWithUser.getTotalMontlyDebt())
+                .approvedLoans(loanWithUser.getApprovedLoan())
                 .name(user.getName())
                 .email(user.getEmail())
                 .baseSalary(user.getBaseSalary())
