@@ -1,13 +1,10 @@
 package com.creditya.loanservice.usecase;
 
-import com.creditya.loanservice.model.LoanWithUser;
+import com.creditya.loanservice.model.loan.data.LoanWithUser;
 import com.creditya.loanservice.model.Page;
-import com.creditya.loanservice.model.loan.Loan;
+import com.creditya.loanservice.model.loan.data.LoanJoinedProjection;
 import com.creditya.loanservice.model.loan.gateways.LoanRepository;
-import com.creditya.loanservice.model.loanstatus.LoanStatus;
 import com.creditya.loanservice.model.loanstatus.gateways.LoanStatusRepository;
-import com.creditya.loanservice.model.loantype.LoanType;
-import com.creditya.loanservice.model.loantype.gateways.LoanTypeRepository;
 import com.creditya.loanservice.model.usersnapshot.UserSnapshot;
 import com.creditya.loanservice.model.usersnapshot.gateways.UserSnapshotRepository;
 import com.creditya.loanservice.model.utils.gateways.UseCaseLogger;
@@ -15,7 +12,6 @@ import com.creditya.loanservice.usecase.exception.IndexOutOfBoundsExceptionPage;
 import com.creditya.loanservice.usecase.exception.IndexOutOfBoundsExceptionPageSize;
 import com.creditya.loanservice.usecase.utils.LoanCalculator;
 import lombok.RequiredArgsConstructor;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.*;
@@ -26,102 +22,151 @@ public class GetPaginationLoanUseCase {
     private final LoanRepository loanRepository;
     private final LoanStatusRepository loanStatusRepository;
     private final UserSnapshotRepository userSnapshotRepository;
-    private final LoanTypeRepository loanTypeRepository;
     private final LoanCalculator loanCalculator;
     private final UseCaseLogger logger;
+
+    private static final int MAX_PAGE_SIZE = 20;
+    private static final int DEFAULT_PAGE = 0;
+    private static final int MIN_PAGE_SIZE = 1;
 
     public Mono<Page<LoanWithUser>> execute(int page, int size, List<String> filterStatuses) {
         validatePaginationParameters(page, size);
 
+        int normalizedPageSize = Math.min(size, MAX_PAGE_SIZE);
+
         return resolveStatusIds(filterStatuses)
-                .flatMap(statusIds -> buildPagedResponse(page, size, statusIds))
-                .doOnError(error -> logger.trace("Error executing GetLoanUnderReviewUseCase", error));
+                .flatMap(statusIds -> buildPage(page, normalizedPageSize, statusIds))
+                .doOnSubscribe(sub -> logExecutionStart(page, size, filterStatuses))
+                .doOnSuccess(this::logExecutionSuccess)
+                .doOnError(this::logExecutionError);
     }
 
     private void validatePaginationParameters(int page, int size) {
-        if (page < 0) throw new IndexOutOfBoundsExceptionPage();
-        if (size <= 0) throw new IndexOutOfBoundsExceptionPageSize();
+        if (page < DEFAULT_PAGE) {
+            throw new IndexOutOfBoundsExceptionPage();
+        }
+        if (size < MIN_PAGE_SIZE) {
+            throw new IndexOutOfBoundsExceptionPageSize();
+        }
     }
 
     private Mono<List<UUID>> resolveStatusIds(List<String> filterStatuses) {
         if (filterStatuses == null || filterStatuses.isEmpty()) {
             return Mono.just(Collections.emptyList());
         }
+
         return loanStatusRepository.findIdsByNames(filterStatuses)
                 .collectList()
                 .doOnNext(ids -> logger.trace("Resolved {} status IDs from {} filter statuses",
-                        ids.size(), filterStatuses.size()));
+                        ids.size(), filterStatuses.size()))
+                .onErrorReturn(Collections.emptyList());
     }
 
-    private Mono<Page<LoanWithUser>> buildPagedResponse(int page, int size, List<UUID> statusIds) {
-        return Mono.zip(
-                getTotalCount(statusIds),
-                getPaginatedLoans(page, size, statusIds)
-        ).flatMap(tuple -> enrichLoansWithUserData(tuple.getT2())
-                .map(enrichedLoans -> buildPageResponse(page, size, tuple.getT1(), enrichedLoans)));
+    private Mono<Page<LoanWithUser>> buildPage(int page, int size, List<UUID> statusIds) {
+        int offset = page * size;
+
+        Mono<List<LoanJoinedProjection>> loansListMono = getLoansList(statusIds, size, offset);
+        Mono<Long> totalCountMono = getTotalCount(statusIds);
+
+        return Mono.zip(loansListMono, totalCountMono)
+                .flatMap(tuple -> {
+                    List<LoanJoinedProjection> loans = tuple.getT1();
+                    Long totalCount = tuple.getT2();
+
+                    return enrichLoansWithUserData(loans)
+                            .map(enrichedLoans -> buildPageResponse(page, size, totalCount, enrichedLoans));
+                });
     }
 
-    private Mono<Long> getTotalCount(List<UUID> statusIds) {
-        return statusIds.isEmpty() ? loanRepository.countAllLoans()
-                : loanRepository.countLoansByStatusIds(statusIds);
-    }
-
-    private Mono<List<Loan>> getPaginatedLoans(int page, int size, List<UUID> statusIds) {
-        Flux<Loan> loanFlux = statusIds.isEmpty() ? loanRepository.findAllLoans()
-                : loanRepository.findLoansByStatusIds(statusIds);
-
-        return loanFlux.skip((long) page * size) // 2 * 10 = 20
-                .take(size)
+    private Mono<List<LoanJoinedProjection>> getLoansList(List<UUID> statusIds, int size, int offset) {
+        UUID[] statusIdsArray = statusIds.toArray(UUID[]::new);
+        return loanRepository.findLoansWithTypeAndStatus(statusIdsArray, size, offset)
                 .collectList();
     }
 
-    private Mono<List<LoanWithUser>> enrichLoansWithUserData(List<Loan> loans) {
-        if (loans.isEmpty()) return Mono.just(Collections.emptyList());
-
-        List<UUID> userIds = loans.stream().map(Loan::getUserId).distinct().toList();
-        List<UUID> loanTypeIds = loans.stream().map(Loan::getIdLoanType).distinct().toList();
-        List<UUID> statusIds = loans.stream().map(Loan::getIdStatus).distinct().toList();
-
-        return Mono.zip(
-                userSnapshotRepository.findUsersByIds(userIds).collectMap(UserSnapshot::getUserId),
-                loanTypeRepository.findByIds(loanTypeIds).collectMap(LoanType::getIdLoanType),
-                loanStatusRepository.findByIds(statusIds).collectMap(LoanStatus::getIdStatus)
-        ).map(tuple -> loans.stream()
-                .map(loan -> buildLoanWithUser(loan, tuple.getT1(), tuple.getT2(), tuple.getT3(), loans))
-                .toList());
+    private Mono<Long> getTotalCount(List<UUID> statusIds) {
+        return statusIds.isEmpty()
+                ? loanRepository.countAllLoans()
+                : loanRepository.countLoansByStatusIds(statusIds);
     }
 
-    private LoanWithUser buildLoanWithUser(
-            Loan loan,
-            Map<UUID, UserSnapshot> userMap,
-            Map<UUID, LoanType> loanTypeMap,
-            Map<UUID, LoanStatus> loanStatusMap,
-            List<Loan> allLoans
-    ) {
-        UserSnapshot user = userMap.get(loan.getUserId());
-        LoanType type = loanTypeMap.get(loan.getIdLoanType());
-        LoanStatus status = loanStatusMap.get(loan.getIdStatus());
+    private Mono<List<LoanWithUser>> enrichLoansWithUserData(List<LoanJoinedProjection> loans) {
+        if (loans.isEmpty()) {
+            return Mono.just(Collections.emptyList());
+        }
 
+        List<UUID> userIds = extractUniqueUserIds(loans);
+
+        return userSnapshotRepository.findUsersByIds(userIds)
+                .collectMap(UserSnapshot::getUserId)
+                .map(userMap -> mapLoansWithUsers(loans, userMap))
+                .onErrorReturn(loans.stream()
+                        .map(loan -> buildLoanWithUser(loan, null))
+                        .toList());
+    }
+
+    private List<UUID> extractUniqueUserIds(List<LoanJoinedProjection> loans) {
+        return loans.stream()
+                .map(LoanJoinedProjection::userId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    private List<LoanWithUser> mapLoansWithUsers(List<LoanJoinedProjection> loans, Map<UUID, UserSnapshot> userMap) {
+        return loans.stream()
+                .map(loan -> buildLoanWithUser(loan, userMap.get(loan.userId())))
+                .toList();
+    }
+
+    private LoanWithUser buildLoanWithUser(LoanJoinedProjection loan, UserSnapshot user) {
         return LoanWithUser.builder()
-                .loan(loan)
+                .idLoan(loan.idLoan())
                 .userSnapshot(user)
-                .loanTypeName(type != null ? type.getName() : null)
-                .loanStatusName(status != null ? status.getName() : null)
-                .interestRate(type != null ? type.getInterestRate() : null)
-                .totalMontlyDebt(loanCalculator.calculateTotalMonthlyDebt(user, allLoans, loanTypeMap, loanStatusMap))
-                .approvedLoan(loanCalculator.calculateApprovedLoansCount(user, allLoans, loanStatusMap))
+                .amount(loan.amount())
+                .loanTerm(loan.loanTerm())
+                .email(loan.email())
+                .dni(loan.dni())
+                .loanStatusName(loan.loanStatusName())
+                .loanTypeName(loan.loanTypeName())
+                .interestRate(loan.interestRate())
+                .totalMonthlyDebt(loanCalculator.calculateTotalMonthlyDebt(loan))
+                .approvedLoan(loanCalculator.calculateApprovedLoansCount(loan))
                 .build();
     }
 
-    private Page<LoanWithUser> buildPageResponse(int page, int size, Long totalElements, List<LoanWithUser> content) {
-        int totalPages = (int) Math.ceil((double) totalElements / size);
+    private Page<LoanWithUser> buildPageResponse(int page, int size, long totalElements, List<LoanWithUser> content) {
+        int totalPages = calculateTotalPages(totalElements, size);
+
+        logger.trace("Built page response: page={}, size={}, totalElements={}, totalPages={}, contentSize={}",
+                page, size, totalElements, totalPages, content.size());
 
         return Page.<LoanWithUser>builder()
                 .content(content)
-                .page(page)
-                .size(size)
+                .start(page)
+                .limit(size)
                 .totalElements(totalElements)
                 .totalPages(totalPages)
                 .build();
+    }
+
+    private int calculateTotalPages(long totalElements, int size) {
+        return totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / size);
+    }
+
+    private void logExecutionStart(int page, int size, List<String> filterStatuses) {
+        logger.trace("Executing GetPaginationLoanUseCase: page={}, size={}, filters={}",
+                page, size, filterStatuses);
+    }
+
+    private void logExecutionSuccess(Page<LoanWithUser> result) {
+        if (result != null) {
+            logger.trace("Successfully executed GetPaginationLoanUseCase: returned {} items",
+                    result.getContent().size());
+        }
+    }
+
+    private void logExecutionError(Throwable error) {
+        logger.error("Error executing GetPaginationLoanUseCase: {}", error.getMessage(), error);
     }
 }

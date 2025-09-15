@@ -9,18 +9,16 @@ spring:
     console:
       enabled: true
       path: "/h2"
-  profiles:
-    include: null
+  cache:
+    type: "caffeine"
   security:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: "http://localhost:8090/.well-known/jwks.json"
-  cache:
-    type: caffeine
+          jwk-set-uri: "http://authentication-service:8090/.well-known/jwks.json"
 logging:
   level:
-    com.creditya.authservice: "trace"
+    com.creditya.loanservice: "trace"
 springdoc:
   api-docs:
     path: "/v3/api-docs"
@@ -40,18 +38,19 @@ management:
       enabled: true
 cors:
   allowed-origins: "http://localhost:4200,http://localhost:8080"
-adapters:
-  r2dbc:
-    host: "localhost"
-    port: 5432
-    database: "loan_db"
-    schema: "public"
-    username: "${DB_USER}"
-    password: "${DB_PASSWORD}"
 adapter:
   restconsumer:
     timeout: 5000
     url: "http://localhost:8080"
+  sqs:
+    region: "us-east-1"
+    #queueUrl: "https://sqs.us-east-1.amazonaws.com/873522994278/loan-notifications-sqs"
+    #endpoint: "http://localhost:4566 # For localstack only"
+    queues:
+      debt-capacity: "https://sqs.us-east-1.amazonaws.com/873522994278/loan-capacidad-endeudamiento-sqs"
+      status-notification: "https://sqs.us-east-1.amazonaws.com/873522994278/loan-notifications-sqs"
+      loan-approved: "https://sqs.us-east-1.amazonaws.com/873522994278/loan-approved-sqs"
+
 resilience4j:
   circuitbreaker:
     instances:
@@ -73,3 +72,37 @@ resilience4j:
         slidingWindowSize: 10
         minimumNumberOfCalls: 10
         waitDurationInOpenState: "10s"
+
+---
+# ===============================================
+# PERFIL 'default' (para desarrollo local)
+# ===============================================
+spring:
+  config:
+    activate:
+      on-profile: default
+adapters:
+  r2dbc:
+    host: "localhost"
+    port: 5432
+    database: "loan_db"
+    schema: "public"
+    username: "postgres"
+    password: "Sh4y0202597."
+
+---
+# ===============================================
+# PERFIL 'docker' (para Docker Compose)
+# ===============================================
+spring:
+  config:
+    activate:
+      on-profile: docker
+adapters:
+  r2dbc:
+    host: ${DB_HOST}
+    port: ${DB_PORT}
+    database: ${DB_NAME}
+    schema: "public"
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}

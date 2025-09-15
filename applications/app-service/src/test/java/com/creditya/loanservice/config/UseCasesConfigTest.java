@@ -7,7 +7,7 @@ import com.creditya.loanservice.model.usersnapshot.gateways.UserSnapshotReposito
 import com.creditya.loanservice.model.utils.gateways.TransactionalGateway;
 import com.creditya.loanservice.model.utils.gateways.UseCaseLogger;
 import com.creditya.loanservice.usecase.GetPaginationLoanUseCase;
-import com.creditya.loanservice.usecase.LoanUseCase;
+import com.creditya.loanservice.usecase.CreateLoanUseCase;
 import com.creditya.loanservice.usecase.utils.LoanCalculator;
 import com.creditya.loanservice.usecase.utils.LoanStatus;
 import org.junit.jupiter.api.DisplayName;
@@ -46,8 +46,8 @@ class UseCasesConfigTest {
         try (AnnotationConfigApplicationContext context =
                      new AnnotationConfigApplicationContext(TestConfig.class)) {
 
-            LoanUseCase loanUseCase = context.getBean(LoanUseCase.class);
-            assertNotNull(loanUseCase, "LoanUseCase bean should be registered");
+            CreateLoanUseCase createLoanUseCase = context.getBean(CreateLoanUseCase.class);
+            assertNotNull(createLoanUseCase, "LoanUseCase bean should be registered");
         }
     }
 

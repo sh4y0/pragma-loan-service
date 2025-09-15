@@ -2,161 +2,230 @@ package com.creditya.loanservice.api;
 
 import com.creditya.loanservice.api.dto.request.LoanCreatedRequestDTO;
 import com.creditya.loanservice.api.dto.response.LoanCreatedResponseDTO;
-import com.creditya.loanservice.api.dto.response.LoanResponseDTO;
+import com.creditya.loanservice.api.exception.model.UnexpectedException;
 import com.creditya.loanservice.api.exception.service.ValidationService;
 import com.creditya.loanservice.api.mapper.LoanMapper;
-import com.creditya.loanservice.model.LoanWithUser;
+import com.creditya.loanservice.model.loan.data.LoanWithUser;
 import com.creditya.loanservice.model.Page;
 import com.creditya.loanservice.model.loan.Loan;
 import com.creditya.loanservice.model.loan.data.LoanData;
+import com.creditya.loanservice.model.usersnapshot.UserSnapshot;
 import com.creditya.loanservice.usecase.GetPaginationLoanUseCase;
-import com.creditya.loanservice.usecase.LoanUseCase;
+import com.creditya.loanservice.usecase.CreateLoanUseCase;
+import com.creditya.loanservice.usecase.exception.BaseException;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 import static org.mockito.Mockito.*;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(MockitoExtension.class)
 class HandlerRestTest {
 
-    @Mock private LoanUseCase loanUseCase;
-    @Mock private LoanMapper loanMapper;
-    @Mock private ValidationService validator;
-    @Mock private GetPaginationLoanUseCase getPaginationLoanUseCase;
-    @Mock private ServerRequest serverRequest;
+    @Mock
+    private CreateLoanUseCase createLoanUseCase;
 
+    @Mock
+    private LoanMapper loanMapper;
+
+    @Mock
+    private ValidationService validator;
+
+    @Mock
+    private GetPaginationLoanUseCase getPaginationLoanUseCase;
+
+    @Mock
+    private ServerRequest serverRequest;
+
+    @InjectMocks
     private Handler handler;
 
-    private LoanCreatedRequestDTO loanDTO;
-    private Loan domain;
-    private LoanData domainData;
+    private Loan loan;
     private LoanWithUser loanWithUser;
-    private LoanResponseDTO responseDTO;
-    private LoanCreatedResponseDTO responseCreateLoanDTO;
+    private LoanData loanData;
+    private LoanCreatedRequestDTO loanRequest;
+    private LoanCreatedResponseDTO loanCreatedResponseDTO;
 
     @BeforeEach
     void setUp() {
-        handler = new Handler(loanUseCase, loanMapper, validator, getPaginationLoanUseCase);
-
-        loanDTO = new LoanCreatedRequestDTO(
-                new BigDecimal("10000.00"),
-                12,
-                "test@example.com",
-                "12345678",
-                "PERSONAL"
-        );
-
-        domain = Loan.builder()
+        loan = Loan.builder()
                 .loanId(UUID.randomUUID())
-                .amount(loanDTO.amount())
-                .loanTerm(loanDTO.loanTerm())
-                .email(loanDTO.email())
-                .dni(loanDTO.dni())
+                .amount(new BigDecimal("1500"))
+                .loanTerm(12)
+                .email("jhoedoe@test.com")
+                .dni("12345678")
+                .idStatus(UUID.randomUUID())
+                .userId(UUID.randomUUID())
                 .build();
 
-        domainData = LoanData.builder()
-                .loanId(domain.getLoanId())
-                .amount(domain.getAmount())
-                .loanTerm(domain.getLoanTerm())
-                .email(domain.getEmail())
-                .dni(domain.getDni())
+        UserSnapshot userSnapshot = UserSnapshot.builder()
+                .userId(UUID.randomUUID())
+                .name("Jhon")
+                .email("jhoedoe@test.com")
+                .baseSalary(new BigDecimal("1500"))
                 .build();
-
-
-         responseCreateLoanDTO= new LoanCreatedResponseDTO(
-                domain.getAmount(),
-                domain.getLoanTerm(),
-                domain.getEmail(),
-                domain.getDni(),
-                loanDTO.loanType()
-        );
 
         loanWithUser = LoanWithUser.builder()
-                .loan(domain)
+                .loanId(UUID.randomUUID())
+                .amount(new BigDecimal("1500"))
+                .loanTerm(12)
+                .email("jhoedoe@test.com")
+                .dni("12345678")
+                .userSnapshot(userSnapshot)
                 .loanTypeName("PERSONAL")
-                .loanStatusName("PENDING")
-                .interestRate(BigDecimal.valueOf(0.05))
-                .totalMontlyDebt(BigDecimal.valueOf(500))
-                .approvedLoan(1L)
+                .loanStatusName("Pending review")
+                .interestRate(new BigDecimal("12"))
+                .totalMontlyDebt(new BigDecimal("2000"))
+                .approvedLoan(0L)
                 .build();
 
-        responseDTO = LoanResponseDTO.builder()
-                .name("Test User")
-                .email(domain.getEmail())
-                .amount(domain.getAmount())
-                .loanTerm(domain.getLoanTerm())
-                .baseSalary(BigDecimal.valueOf(2000))
-                .loanType(loanWithUser.getLoanTypeName())
-                .loanStatus(loanWithUser.getLoanStatusName())
-                .interestRate(loanWithUser.getInterestRate())
-                .totalMontlyDebt(loanWithUser.getTotalMontlyDebt())
-                .approvedLoans(loanWithUser.getApprovedLoan())
+        loanData = LoanData.builder()
+                .loanId(UUID.randomUUID())
+                .amount(new BigDecimal("1500"))
+                .loanTerm(12)
+                .email("jhoedoe@test.com")
+                .dni("12345678")
+                .status("Pending review")
+                .loanType("PERSONAL")
+                .build();
+
+        loanRequest = LoanCreatedRequestDTO.builder()
+                .amount(new BigDecimal("1500"))
+                .loanTerm(12)
+                .email("jhoedoe@test.com")
+                .dni("12345678")
+                .loanType("PERSONAL")
+                .build();
+
+        loanCreatedResponseDTO = LoanCreatedResponseDTO.builder()
+                .amount(new BigDecimal("1500"))
+                .loanTerm(12)
+                .email("jhoedoe@test.com")
+                .dni("12345678")
+                .loanType("PERSONAL")
                 .build();
     }
 
     @Test
-    @DisplayName("createLoan should return ServerResponse with created Loan")
-    void createLoan_shouldReturnServerResponse() {
-        when(serverRequest.bodyToMono(LoanCreatedRequestDTO.class)).thenReturn(Mono.just(loanDTO));
-        when(validator.validate(loanDTO)).thenReturn(Mono.just(loanDTO));
-        when(loanMapper.toLoan(loanDTO)).thenReturn(domain);
-        when(loanUseCase.createLoan(domain, "PERSONAL")).thenReturn(Mono.just(domainData));
-        when(loanMapper.toLoanCreateResponseDTO(domainData)).thenReturn(responseCreateLoanDTO);
+    void createLoan_success() {
+        when(serverRequest.bodyToMono(LoanCreatedRequestDTO.class)).thenReturn(Mono.just(loanRequest));
+        when(validator.validate(loanRequest)).thenReturn(Mono.just(loanRequest));
+        when(loanMapper.toLoan(loanRequest)).thenReturn(loan);
+        when(createLoanUseCase.createLoan(loan, loanRequest.loanType())).thenReturn(Mono.just(loanData));
+        when(loanMapper.toLoanCreateResponseDTO(loanData)).thenReturn(loanCreatedResponseDTO);
 
-        Mono<ServerResponse> result = handler.createLoan(serverRequest);
+        Mono<ServerResponse> responseMono = handler.createLoan(serverRequest);
 
-        StepVerifier.create(result)
-                .expectNextMatches(res -> res.statusCode().is2xxSuccessful())
+        StepVerifier.create(responseMono)
+                .expectNextMatches(response ->
+                        response.statusCode().equals(HttpStatus.CREATED) &&
+                                Objects.equals(response.headers().getContentType(), MediaType.APPLICATION_JSON))
                 .verifyComplete();
-
-        verify(loanUseCase, times(1)).createLoan(domain, "PERSONAL");
-        verify(loanMapper, times(1)).toLoanCreateResponseDTO(domainData);
     }
 
     @Test
-    @DisplayName("getLoans should return PageResponse<LoanResponseDTO>")
-    void getLoans_shouldReturnPageResponse() {
-        Page<LoanWithUser> pageResponse = Page.<LoanWithUser>builder()
-                .page(0)
-                .size(10)
-                .totalElements(1L)
+    void createLoan_validationFails() {
+        when(serverRequest.bodyToMono(LoanCreatedRequestDTO.class)).thenReturn(Mono.just(loanRequest));
+
+        Map<String, String> errors = Map.of("field1", "must not be null");
+        BaseException baseException = new BaseException(
+                "ERR_VALIDATION",
+                "Validation Error",
+                "Validation failed",
+                400,
+                errors
+        );
+
+        when(validator.validate(loanRequest)).thenReturn(Mono.error(baseException));
+
+        Mono<ServerResponse> responseMono = handler.createLoan(serverRequest);
+
+        StepVerifier.create(responseMono)
+                .expectErrorMatches(throwable -> throwable instanceof BaseException &&
+                        throwable.getMessage().equals("Validation failed") &&
+                        ((BaseException) throwable).getErrorCode().equals("ERR_VALIDATION") &&
+                        ((BaseException) throwable).getStatus() == 400 &&
+                        ((BaseException) throwable).getErrors().equals(errors))
+                .verify();
+    }
+    @Test
+    void createLoan_unexpectedException() {
+        when(serverRequest.bodyToMono(LoanCreatedRequestDTO.class)).thenReturn(Mono.just(loanRequest));
+        when(validator.validate(loanRequest)).thenReturn(Mono.just(loanRequest));
+        when(loanMapper.toLoan(loanRequest)).thenReturn(loan);
+        when(createLoanUseCase.createLoan(loan, loanRequest.loanType())).thenReturn(Mono.error(new RuntimeException("Boom")));
+
+        Mono<ServerResponse> responseMono = handler.createLoan(serverRequest);
+
+        StepVerifier.create(responseMono)
+                .expectErrorMatches(throwable -> throwable instanceof UnexpectedException &&
+                        throwable.getCause().getMessage().equals("Boom"))
+                .verify();
+    }
+
+    @Test
+    void getLoans_withContent() {
+        when(serverRequest.queryParam("start")).thenReturn(java.util.Optional.of("1"));
+        when(serverRequest.queryParam("limit")).thenReturn(java.util.Optional.of("10"));
+        when(serverRequest.queryParams()).thenReturn(new org.springframework.util.LinkedMultiValueMap<>());
+
+        Page<LoanWithUser> page = Page.<LoanWithUser>builder()
+                .start(1)
+                .limit(10)
+                .totalElements(1)
                 .totalPages(1)
                 .content(List.of(loanWithUser))
                 .build();
 
-        when(serverRequest.queryParam("page")).thenReturn(java.util.Optional.of("0"));
-        when(serverRequest.queryParam("size")).thenReturn(java.util.Optional.of("10"));
-        when(serverRequest.queryParams()).thenReturn(new org.springframework.util.LinkedMultiValueMap<>());
-        when(getPaginationLoanUseCase.execute(0, 10, List.of())).thenReturn(Mono.just(pageResponse));
-        when(loanMapper.toLoanCreateResponseDTO(loanWithUser)).thenReturn(responseDTO);
+        when(getPaginationLoanUseCase.execute(1, 10, Collections.emptyList())).thenReturn(Mono.just(page));
+        Mono<ServerResponse> responseMono = handler.getLoans(serverRequest);
 
-        Mono<ServerResponse> result = handler.getLoans(serverRequest);
-
-        StepVerifier.create(result)
-                .expectNextMatches(res -> res.statusCode().is2xxSuccessful())
+        StepVerifier.create(responseMono)
+                .expectNextMatches(response -> response.statusCode().is2xxSuccessful() &&
+                        Objects.equals(response.headers().getContentType(), MediaType.APPLICATION_JSON))
                 .verifyComplete();
-
-        verify(getPaginationLoanUseCase, times(1)).execute(0, 10, List.of());
-        verify(loanMapper, times(1)).toLoanCreateResponseDTO(loanWithUser);
     }
 
     @Test
-    @DisplayName("createLoanDoc should return empty Mono")
-    void createLoanDoc_shouldReturnEmptyMono() {
-        StepVerifier.create(handler.createLoanDoc(loanDTO))
-                .expectNextCount(0)
+    void getLoans_emptyContent() {
+        when(serverRequest.queryParam("start")).thenReturn(java.util.Optional.empty());
+        when(serverRequest.queryParam("limit")).thenReturn(java.util.Optional.empty());
+        when(serverRequest.queryParams()).thenReturn(new org.springframework.util.LinkedMultiValueMap<>());
+
+        Page<LoanWithUser> page = Page.<LoanWithUser>builder()
+                .start(0)
+                .limit(20)
+                .totalElements(0)
+                .totalPages(0)
+                .content(Collections.emptyList())
+                .build();
+
+        when(getPaginationLoanUseCase.execute(0, 20, Collections.emptyList())).thenReturn(Mono.just(page));
+
+        Mono<ServerResponse> responseMono = handler.getLoans(serverRequest);
+
+        StepVerifier.create(responseMono)
+                .expectNextMatches(response -> response.statusCode().is2xxSuccessful() &&
+                        Objects.equals(response.headers().getContentType(), MediaType.APPLICATION_JSON))
+                .verifyComplete();
+    }
+
+    @Test
+    void createLoanDoc_returnsEmptyMono() {
+        Mono<Void> result = handler.createLoanDoc(loanRequest);
+        StepVerifier.create(result)
                 .verifyComplete();
     }
 }

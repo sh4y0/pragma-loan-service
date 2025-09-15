@@ -3,7 +3,7 @@ package com.creditya.loanservice.api.mapper;
 import com.creditya.loanservice.api.dto.request.LoanCreatedRequestDTO;
 import com.creditya.loanservice.api.dto.response.LoanCreatedResponseDTO;
 import com.creditya.loanservice.api.dto.response.LoanResponseDTO;
-import com.creditya.loanservice.model.LoanWithUser;
+import com.creditya.loanservice.model.loan.data.LoanWithUser;
 import com.creditya.loanservice.model.loan.Loan;
 import com.creditya.loanservice.model.loan.data.LoanData;
 import com.creditya.loanservice.model.usersnapshot.UserSnapshot;
@@ -72,24 +72,21 @@ class LoanMapperTest {
 
     @Test
     void toLoanCreateResponseDTO_shouldMapLoanWithUserToResponse() {
-        Loan loan = Loan.builder()
+        UserSnapshot user = new UserSnapshot(UUID.randomUUID(),"John Doe", "loan@mail.com", new BigDecimal("1500.00"));
+
+        LoanWithUser loanWithUser = LoanWithUser.builder()
+                .loanId(UUID.randomUUID())
                 .amount(new BigDecimal("7500.00"))
                 .loanTerm(36)
                 .email("loan@mail.com")
                 .dni("11223344")
+                .userSnapshot(user)
+                .loanTypeName("CAR")
+                .loanStatusName("APPROVED")
+                .interestRate(new BigDecimal("5.5"))
+                .totalMontlyDebt(new BigDecimal("200.00"))
+                .approvedLoan(3L)
                 .build();
-
-        UserSnapshot user = new UserSnapshot(UUID.randomUUID(),"John Doe", "loan@mail.com", new BigDecimal("1500.00"));
-
-        LoanWithUser loanWithUser = new LoanWithUser(
-                loan,
-                user,
-                "CAR",
-                "APPROVED",
-                new BigDecimal("5.5"),
-                new BigDecimal("200.00"),
-                3L
-        );
 
         Mono<LoanResponseDTO> result = Mono.fromSupplier(() -> mapper.toLoanCreateResponseDTO(loanWithUser));
 
@@ -97,8 +94,8 @@ class LoanMapperTest {
                 .assertNext(response -> {
                     assertThat(response.amount()).isEqualByComparingTo("7500.00");
                     assertThat(response.loanTerm()).isEqualTo(36);
-                    assertThat(response.email()).isEqualTo("loan@mail.com"); // desde Loan
-                    assertThat(response.name()).isEqualTo("John Doe"); // desde UserSnapshot
+                    assertThat(response.email()).isEqualTo("loan@mail.com");
+                    assertThat(response.name()).isEqualTo("John Doe");
                     assertThat(response.baseSalary()).isEqualByComparingTo("1500.00");
                     assertThat(response.loanType()).isEqualTo("CAR");
                     assertThat(response.loanStatus()).isEqualTo("APPROVED");
@@ -108,4 +105,5 @@ class LoanMapperTest {
                 })
                 .verifyComplete();
     }
+
 }

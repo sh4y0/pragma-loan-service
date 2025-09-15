@@ -35,9 +35,4 @@ public class LoanStatusReactiveRepositoryAdapter extends ReactiveAdapterOperatio
         return this.repository.findByNameIn(statusNames).map(LoanStatusEntity::getIdStatus);
     }
 
-    @Override
-    public Flux<LoanStatus> findByIds(List<UUID> uuids) {
-        return this.repository.findAllById(uuids)
-                .map(this::toEntity);
-    }
 }

@@ -2,12 +2,11 @@ package com.creditya.loanservice.consumer;
 
 import com.creditya.loanservice.model.usersnapshot.UserSnapshot;
 import com.creditya.loanservice.model.usersnapshot.gateways.UserSnapshotRepository;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.UUID;
@@ -24,5 +23,13 @@ public class RestConsumer implements UserSnapshotRepository {
                 .bodyValue(userIds)
                 .retrieve()
                 .bodyToFlux(UserSnapshot.class);
+    }
+
+    @Override
+    public Mono<UserSnapshot> findUserById(UUID userId) {
+        return webClient.get()
+                .uri("/api/v1/clients/{userId}", userId)
+                .retrieve()
+                .bodyToMono(UserSnapshot.class);
     }
 }

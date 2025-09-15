@@ -9,7 +9,7 @@ import com.creditya.loanservice.model.loan.Loan;
 import com.creditya.loanservice.model.loan.data.LoanData;
 import com.creditya.loanservice.model.utils.gateways.UseCaseLogger;
 import com.creditya.loanservice.usecase.GetPaginationLoanUseCase;
-import com.creditya.loanservice.usecase.LoanUseCase;
+import com.creditya.loanservice.usecase.CreateLoanUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +32,7 @@ import static org.mockito.Mockito.when;
 class RouterRestTest {
 
     @MockitoBean
-    private LoanUseCase loanUseCase;
+    private CreateLoanUseCase createLoanUseCase;
 
     @MockitoBean
     private LoanMapper loanMapper;
@@ -53,7 +53,7 @@ class RouterRestTest {
 
     @BeforeEach
     void setUp() {
-        Handler handler = new Handler(loanUseCase, loanMapper, validator, getPaginationLoanUseCase);
+        Handler handler = new Handler(createLoanUseCase, loanMapper, validator, getPaginationLoanUseCase);
 
         webTestClient = WebTestClient.bindToRouterFunction(
                 RouterFunctions.route()
@@ -101,7 +101,7 @@ class RouterRestTest {
                 .thenReturn(Mono.just(loanDTO));
         when(loanMapper.toLoan(any(LoanCreatedRequestDTO.class)))
                 .thenReturn(domain);
-        when(loanUseCase.createLoan(any(), any()))
+        when(createLoanUseCase.createLoan(any(), any()))
                 .thenReturn(Mono.just(domainLoanData));
         when(loanMapper.toLoanCreateResponseDTO(domainLoanData))
                 .thenReturn(responseDTO);

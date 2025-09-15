@@ -15,12 +15,13 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
-import static org.springframework.web.reactive.function.server.RequestPredicates.GET;
-import static org.springframework.web.reactive.function.server.RequestPredicates.POST;
+import static org.springframework.web.reactive.function.server.RequestPredicates.*;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
 @Configuration
 public class RouterRest {
+    private static final String URL_API_LOAN = "/api/v1/loan";
+
     @Bean
     @RouterOperations({
             @RouterOperation(
@@ -63,8 +64,9 @@ public class RouterRest {
             )
     })
     public RouterFunction<ServerResponse> routerFunction(Handler handler, GlobalExceptionFilter globalExceptionHandler) {
-        return route(POST("/api/v1/loan"), handler::createLoan)
-                .andRoute(GET("/api/v1/loan"), handler::getLoans)
+        return route(POST(URL_API_LOAN), handler::createLoan)
+                .andRoute(GET(URL_API_LOAN), handler::getLoans)
+                .andRoute(PUT(URL_API_LOAN), handler::updateLoan)
                 .filter(globalExceptionHandler);
     }
 }

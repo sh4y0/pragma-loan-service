@@ -1,15 +1,19 @@
 package com.creditya.loanservice.api.mapper;
 
 import com.creditya.loanservice.api.dto.request.LoanCreatedRequestDTO;
+import com.creditya.loanservice.api.dto.request.LoanUpdateRequestDTO;
 import com.creditya.loanservice.api.dto.response.LoanCreatedResponseDTO;
 import com.creditya.loanservice.api.dto.response.LoanResponseDTO;
-import com.creditya.loanservice.model.LoanWithUser;
+import com.creditya.loanservice.api.dto.response.LoanUpdateResponseDTO;
+import com.creditya.loanservice.model.loan.data.LoanWithUser;
 import com.creditya.loanservice.model.loan.Loan;
 import com.creditya.loanservice.model.loan.data.LoanData;
+import com.creditya.loanservice.model.loan.data.LoanDecision;
 import com.creditya.loanservice.model.usersnapshot.UserSnapshot;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Component
 public class LoanMapper {
@@ -29,17 +33,33 @@ public class LoanMapper {
         return loan.build();
     }
 
+    public LoanDecision toLoanDecision(LoanUpdateRequestDTO loanUpdateRequestDTO) {
+        if ( loanUpdateRequestDTO == null ) {
+            return null;
+        }
+
+        LoanDecision.LoanDecisionBuilder loanDecision = LoanDecision.builder();
+
+        loanDecision.idLoan(loanUpdateRequestDTO.idLoan());
+        loanDecision.status( loanUpdateRequestDTO.status());
+
+        return loanDecision.build();
+
+    }
+
     public LoanCreatedResponseDTO toLoanCreateResponseDTO(LoanData loandData) {
         if ( loandData == null ) {
             return null;
         }
 
+        UUID idLoan;
         BigDecimal amount;
         int loanTerm = 0;
         String email;
         String dni;
         String loanType;
 
+        idLoan = loandData.getIdLoan();
         amount = loandData.getAmount();
         if ( loandData.getLoanTerm() != null ) {
             loanTerm = loandData.getLoanTerm();
@@ -48,25 +68,40 @@ public class LoanMapper {
         dni = loandData.getDni();
         loanType = loandData.getLoanType();
 
-        return new LoanCreatedResponseDTO( amount, loanTerm, email, dni, loanType );
+        return new LoanCreatedResponseDTO(idLoan, amount, loanTerm, email, dni, loanType );
     }
 
     public LoanResponseDTO toLoanCreateResponseDTO(LoanWithUser loanWithUser) {
-        Loan loan = loanWithUser.getLoan();
         UserSnapshot user = loanWithUser.getUserSnapshot();
 
         return LoanResponseDTO.builder()
-                .amount(loan.getAmount())
-                .loanTerm(loan.getLoanTerm())
-                .email(loan.getEmail())
+                .idLoan(loanWithUser.getIdLoan())
+                .amount(loanWithUser.getAmount())
+                .loanTerm(loanWithUser.getLoanTerm())
+                .email(loanWithUser.getEmail())
+                .dni(loanWithUser.getDni())
                 .loanType(loanWithUser.getLoanTypeName())
                 .loanStatus(loanWithUser.getLoanStatusName())
                 .interestRate(loanWithUser.getInterestRate())
-                .totalMontlyDebt(loanWithUser.getTotalMontlyDebt())
+                .totalMontlyDebt(loanWithUser.getTotalMonthlyDebt())
                 .approvedLoans(loanWithUser.getApprovedLoan())
                 .name(user.getName())
                 .email(user.getEmail())
                 .baseSalary(user.getBaseSalary())
                 .build();
+    }
+
+    public LoanUpdateResponseDTO toLoanUpdateResponseDTO(LoanDecision loanDecision) {
+        if ( loanDecision == null ) {
+            return null;
+        }
+
+        UUID idLoan;
+        String status;
+
+        idLoan = loanDecision.getIdLoan();
+        status = loanDecision.getStatus();
+
+        return new LoanUpdateResponseDTO(idLoan, status);
     }
 }

@@ -2,17 +2,20 @@ package com.creditya.loanservice.usecase.utils;
 
 import lombok.RequiredArgsConstructor;
 
+import static com.creditya.loanservice.model.loanstatus.Status.*;
+
 @RequiredArgsConstructor
 public class LoanStatus {
-    private static final String APPROVED = "Approved";
-    private static final String PENDING_REVIEW = "Pending review";
-    private static final String REJECTED = "Rejected";
 
     public boolean isApproved(String statusName) {
-        return statusName.equals(APPROVED);
+        return statusName.equals(APPROVED.getName());
     }
 
     public boolean isPending(String statusName) {
-        return statusName.equals(PENDING_REVIEW);
+        return statusName.equals(PENDING.name());
+    }
+
+    public boolean isRejected(String statusName) {
+        return statusName.equals(REJECTED.getName());
     }
 }

@@ -11,7 +11,8 @@ public class WebClienteConfig {
 
     @Bean
     public WebClient authWebClient() {
-        String authServiceUrl = "http://localhost:8090";
+        //String authServiceUrl = "http://localhost:8090";
+        String authServiceUrl = "http://authentication-service:8090";
         return WebClient.builder()
                 .baseUrl(authServiceUrl)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)

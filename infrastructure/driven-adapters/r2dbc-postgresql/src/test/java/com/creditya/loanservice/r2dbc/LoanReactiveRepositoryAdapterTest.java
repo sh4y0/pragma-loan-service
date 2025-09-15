@@ -1,12 +1,12 @@
 package com.creditya.loanservice.r2dbc;
 
 import com.creditya.loanservice.model.loan.Loan;
+import com.creditya.loanservice.model.loan.data.LoanJoinedProjection;
 import com.creditya.loanservice.r2dbc.entity.LoanEntity;
 import com.creditya.loanservice.r2dbc.loan_adapter.LoanReactiveRepository;
 import com.creditya.loanservice.r2dbc.loan_adapter.LoanReactiveRepositoryAdapter;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.reactivecommons.utils.ObjectMapper;
@@ -14,94 +14,49 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
-
 import static org.mockito.Mockito.*;
-
-import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(MockitoExtension.class)
 class LoanReactiveRepositoryAdapterTest {
 
-    @InjectMocks
-    LoanReactiveRepositoryAdapter repositoryAdapter;
+    @Mock
+    private LoanReactiveRepository repository;
 
     @Mock
-    LoanReactiveRepository repository;
+    private ObjectMapper mapper;
 
-    @Mock
-    ObjectMapper mapper;
-
-    private Loan loan;
-    private LoanEntity loanEntity;
-    private UUID statusId;
-
-    @BeforeEach
-    void setUp() {
-        statusId = UUID.randomUUID();
-
-        loan = Loan.builder()
-                .loanId(UUID.randomUUID())
-                .amount(new BigDecimal("10000"))
-                .loanTerm(12)
-                .email("test@example.com")
-                .dni("12345678")
-                .idStatus(UUID.randomUUID())
-                .idLoanType(UUID.randomUUID())
-                .build();
-
-        loanEntity = LoanEntity.builder()
-                .idLoan(loan.getLoanId())
-                .amount(loan.getAmount())
-                .loanTerm(loan.getLoanTerm())
-                .email(loan.getEmail())
-                .dni(loan.getDni())
-                .idStatus(loan.getIdStatus())
-                .idLoanType(loan.getIdLoanType())
-                .build();
-    }
+    private LoanReactiveRepositoryAdapter adapter;
 
     @Test
-    void createLoan_success() {
-        when(mapper.map(loan, LoanEntity.class)).thenReturn(loanEntity);
-        when(repository.save(loanEntity)).thenReturn(Mono.just(loanEntity));
-        when(mapper.map(loanEntity, Loan.class)).thenReturn(loan);
+    void createLoan_delegatesToRepositoryAndMaps() {
+        adapter = new LoanReactiveRepositoryAdapter(repository, mapper);
 
-        Mono<Loan> result = repositoryAdapter.createLoan(loan);
+        Loan loan = new Loan();
+        LoanEntity entity = new LoanEntity();
+        Loan mappedLoan = new Loan();
 
-        StepVerifier.create(result)
-                .expectNextMatches(l -> l.getLoanId().equals(loan.getLoanId()) &&
-                        l.getAmount().equals(loan.getAmount()))
+        doReturn(entity).when(mapper).map(loan, LoanEntity.class);
+        doReturn(mappedLoan).when(mapper).map(entity, Loan.class);
+
+        when(repository.save(entity)).thenReturn(Mono.just(entity));
+
+        StepVerifier.create(adapter.createLoan(loan))
+                .expectNext(mappedLoan)
                 .verifyComplete();
 
-        verify(repository, times(1)).save(loanEntity);
+        verify(repository).save(entity);
+        verify(mapper).map(loan, LoanEntity.class);
+        verify(mapper).map(entity, Loan.class);
     }
 
     @Test
-    void findLoansByStatusIds_success() {
-        List<UUID> statusIds = List.of(statusId);
-
-        when(repository.findAllByIdStatusIn(statusIds)).thenReturn(Flux.just(loanEntity));
-        when(mapper.map(loanEntity, Loan.class)).thenReturn(loan);
-
-        Flux<Loan> result = repositoryAdapter.findLoansByStatusIds(statusIds);
-
-        StepVerifier.create(result)
-                .expectNextMatches(l -> l.getLoanId().equals(loan.getLoanId()))
-                .verifyComplete();
-
-        verify(repository, times(1)).findAllByIdStatusIn(statusIds);
-    }
-
-    @Test
-    void countAllLoans_success() {
+    void countAllLoans_delegatesToRepository() {
+        adapter = new LoanReactiveRepositoryAdapter(repository, mapper);
         when(repository.count()).thenReturn(Mono.just(5L));
 
-        Mono<Long> result = repositoryAdapter.countAllLoans();
-
-        StepVerifier.create(result)
+        StepVerifier.create(adapter.countAllLoans())
                 .expectNext(5L)
                 .verifyComplete();
 
@@ -109,31 +64,53 @@ class LoanReactiveRepositoryAdapterTest {
     }
 
     @Test
-    void findAllLoans_success() {
-        when(repository.findAll()).thenReturn(Flux.just(loanEntity));
-        when(mapper.map(loanEntity, Loan.class)).thenReturn(loan);
+    void findAllLoans_delegatesToRepository() {
+        adapter = new LoanReactiveRepositoryAdapter(repository, mapper);
 
-        Flux<Loan> result = repositoryAdapter.findAllLoans();
+        LoanJoinedProjection projection = new LoanJoinedProjection(
+                UUID.randomUUID(), UUID.randomUUID(), null, 12,
+                "email@test.com", "12345678", "Pending review", "PERSONAL", null
+        );
+        when(repository.findAllLoans()).thenReturn(Flux.just(projection));
 
-        StepVerifier.create(result)
-                .expectNextMatches(l -> l.getLoanId().equals(loan.getLoanId()))
+        StepVerifier.create(adapter.findAllLoans())
+                .expectNext(projection)
                 .verifyComplete();
 
-        verify(repository, times(1)).findAll();
+        verify(repository, times(1)).findAllLoans();
     }
 
     @Test
-    void countLoansByStatusIds_success() {
-        List<UUID> statusIds = List.of(statusId);
+    void countLoansByStatusIds_delegatesToRepository() {
+        adapter = new LoanReactiveRepositoryAdapter(repository, mapper);
 
+        List<UUID> statusIds = List.of(UUID.randomUUID());
         when(repository.countByIdStatusIn(statusIds)).thenReturn(Mono.just(3L));
 
-        Mono<Long> result = repositoryAdapter.countLoansByStatusIds(statusIds);
-
-        StepVerifier.create(result)
+        StepVerifier.create(adapter.countLoansByStatusIds(statusIds))
                 .expectNext(3L)
                 .verifyComplete();
 
         verify(repository, times(1)).countByIdStatusIn(statusIds);
+    }
+
+    @Test
+    void findLoansWithTypeAndStatus_delegatesToRepository() {
+        adapter = new LoanReactiveRepositoryAdapter(repository, mapper);
+
+        UUID[] statusIds = {UUID.randomUUID()};
+        LoanJoinedProjection projection = new LoanJoinedProjection(
+                UUID.randomUUID(), UUID.randomUUID(), null, 12,
+                "email@test.com", "12345678", "Approved", "PERSONAL", null
+        );
+
+        when(repository.findLoansWithTypeAndStatus(statusIds, 10, 0))
+                .thenReturn(Flux.just(projection));
+
+        StepVerifier.create(adapter.findLoansWithTypeAndStatus(statusIds, 10, 0))
+                .expectNext(projection)
+                .verifyComplete();
+
+        verify(repository, times(1)).findLoansWithTypeAndStatus(statusIds, 10, 0);
     }
 }

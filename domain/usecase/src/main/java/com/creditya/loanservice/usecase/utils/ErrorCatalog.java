@@ -8,7 +8,6 @@ import java.util.Map;
 @Getter
 @AllArgsConstructor
 public enum ErrorCatalog {
-
     PAGE_INDEX_NEGATIVE(
             "APPLICATIONS_PAGE_INDEX_NEGATIVE",
             "Page Index Negative",
@@ -61,7 +60,7 @@ public enum ErrorCatalog {
             "Loan type Not Found",
             "The specified loan type does not exist in the system.",
             404,
-            Map.of("loan", "The loan you requested could not be found. Please verify the ID or DNI.")
+            Map.of("loan", "The loan you requested could not be found.")
     ),
 
     LOAN_STATUS_NOT_FOUND(
@@ -78,6 +77,16 @@ public enum ErrorCatalog {
             "The requested loan type could not be found.",
             404,
             Map.of("loanType", "The loan type you provided does not exist in the system.")
+    ),
+
+    LOAN_NOT_FOUND(
+            "LOAN_NOT_FOUND",
+            "Loan Not Found",
+            "The loan with the specified ID does not exist.",
+            404,
+            Map.of(
+                    "idLoan", "No loan was found with the provided ID."
+            )
     ),
 
     LOAN_AMOUNT_OUT_OF_RANGE(

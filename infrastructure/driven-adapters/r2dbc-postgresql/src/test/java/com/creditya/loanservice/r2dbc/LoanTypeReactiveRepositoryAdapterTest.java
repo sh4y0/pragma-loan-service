@@ -68,22 +68,6 @@ class LoanTypeReactiveRepositoryAdapterTest {
     }
 
     @Test
-    void findByIds_success() {
-        List<UUID> ids = List.of(loanTypeId);
-
-        when(repository.findAllById(ids)).thenReturn(Flux.just(loanTypeEntity));
-        when(mapper.map(loanTypeEntity, LoanType.class)).thenReturn(loanType);
-
-        Flux<LoanType> result = repositoryAdapter.findByIds(ids);
-
-        StepVerifier.create(result)
-                .expectNextMatches(l -> l.getIdLoanType().equals(loanTypeId))
-                .verifyComplete();
-
-        verify(repository, times(1)).findAllById(ids);
-    }
-
-    @Test
     void findByName_notFound() {
         when(repository.findByName("UNKNOWN")).thenReturn(Mono.empty());
 
@@ -93,15 +77,4 @@ class LoanTypeReactiveRepositoryAdapterTest {
         verify(repository, times(1)).findByName("UNKNOWN");
     }
 
-    @Test
-    void findByIds_emptyList() {
-        List<UUID> ids = List.of();
-
-        when(repository.findAllById(ids)).thenReturn(Flux.empty());
-
-        StepVerifier.create(repositoryAdapter.findByIds(ids))
-                .verifyComplete();
-
-        verify(repository, times(1)).findAllById(ids);
-    }
 }

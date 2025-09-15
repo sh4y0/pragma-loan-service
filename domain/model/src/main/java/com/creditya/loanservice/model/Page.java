@@ -11,8 +11,8 @@ import java.util.List;
 @Setter
 public class Page<T> {
     private List<T> content;
-    private int page;
-    private int size;
+    private int start;
+    private int limit;
     private long totalElements;
     private int totalPages;
 

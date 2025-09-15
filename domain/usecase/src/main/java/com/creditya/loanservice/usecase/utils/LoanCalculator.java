@@ -1,73 +1,56 @@
 package com.creditya.loanservice.usecase.utils;
 
-import com.creditya.loanservice.model.loan.Loan;
-import com.creditya.loanservice.model.loantype.LoanType;
-import com.creditya.loanservice.model.usersnapshot.UserSnapshot;
+import com.creditya.loanservice.model.loan.data.LoanJoinedProjection;
+import com.creditya.loanservice.usecase.exception.IndexOutOfBoundsExceptionPage;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 public class LoanCalculator {
 
     private static final int DEFAULT_DECIMAL_SCALE = 2;
+    private static final int EXTRA_PRECISION = 4;
     private static final RoundingMode DEFAULT_ROUNDING_MODE = RoundingMode.HALF_UP;
 
     private final LoanStatus loanStatus;
 
     public LoanCalculator(LoanStatus loanStatus) {
-        this.loanStatus = loanStatus;
+        this.loanStatus = Objects.requireNonNull(loanStatus, "loanStatus must not be null");
     }
 
-    public BigDecimal calculateTotalMonthlyDebt(
-            UserSnapshot user,
-            List<Loan> allLoans,
-            Map<UUID, LoanType> loanTypeMap,
-            Map<UUID, com.creditya.loanservice.model.loanstatus.LoanStatus> loanStatusMap
-    ) {
-        if (user == null) return BigDecimal.ZERO;
-
-        return allLoans.stream()
-                .filter(loan -> user.getUserId().equals(loan.getUserId()))
-                .filter(loan -> {
-                    com.creditya.loanservice.model.loanstatus.LoanStatus status = loanStatusMap.get(loan.getIdStatus());
-                    return status != null && (loanStatus.isApproved(status.getName())
-                            || loanStatus.isPending(status.getName()));
-                })
-                .map(loan -> {
-                    LoanType type = loanTypeMap.get(loan.getIdLoanType());
-                    return calculateMonthlyPayment(loan, type != null ? type.getInterestRate() : BigDecimal.ZERO);
-                })
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    public long calculateApprovedLoansCount(LoanJoinedProjection loan) {
+        if (loan == null || loan.loanStatusName() == null) {
+            return 0;
+        }
+        return loanStatus.isApproved(loan.loanStatusName()) ? 1 : 0;
     }
 
-    public long calculateApprovedLoansCount(UserSnapshot user, List<Loan> allLoans, Map<UUID, com.creditya.loanservice.model.loanstatus.LoanStatus> loanStatusMap) {
-        if (user == null) return 0;
+    public BigDecimal calculateTotalMonthlyDebt(LoanJoinedProjection loan) {
+        Objects.requireNonNull(loan, "loan must not be null");
+        Objects.requireNonNull(loan.amount(), "loan amount must not be null");
+        Objects.requireNonNull(loan.interestRate(), "interestRate must not be null");
 
-        return allLoans.stream()
-                .filter(loan -> user.getUserId().equals(loan.getUserId()))
-                .map(loan -> loanStatusMap.get(loan.getIdStatus()))
-                .filter(Objects::nonNull)
-                .filter(status -> loanStatus.isApproved(status.getName()))
-                .count();
-    }
+        if (loan.loanTerm() <= 0) {
+            throw new IndexOutOfBoundsExceptionPage();
+        }
 
-    public BigDecimal calculateMonthlyPayment(Loan loan, BigDecimal annualRate) {
-        if (loan.getLoanTerm() <= 0) throw new IllegalArgumentException("Loan term must be positive");
+        BigDecimal monthlyRate = loan.interestRate()
+                .divide(BigDecimal.valueOf(100), DEFAULT_DECIMAL_SCALE + EXTRA_PRECISION, DEFAULT_ROUNDING_MODE)
+                .divide(BigDecimal.valueOf(12), DEFAULT_DECIMAL_SCALE + EXTRA_PRECISION, DEFAULT_ROUNDING_MODE);
 
-        BigDecimal monthlyRate = annualRate
-                .divide(BigDecimal.valueOf(100), DEFAULT_DECIMAL_SCALE + 4, DEFAULT_ROUNDING_MODE)
-                .divide(BigDecimal.valueOf(12), DEFAULT_DECIMAL_SCALE + 4, DEFAULT_ROUNDING_MODE);
+        if (monthlyRate.compareTo(BigDecimal.ZERO) == 0) {
+            return loan.amount()
+                    .divide(BigDecimal.valueOf(loan.loanTerm()), DEFAULT_DECIMAL_SCALE, DEFAULT_ROUNDING_MODE);
+        }
 
-        BigDecimal onePlusRatePow = BigDecimal.ONE.add(monthlyRate)
-                .pow(-loan.getLoanTerm(), MathContext.DECIMAL64);
+        BigDecimal onePlusRate = BigDecimal.ONE.add(monthlyRate);
+        BigDecimal numerator = monthlyRate.multiply(onePlusRate.pow(loan.loanTerm(), MathContext.DECIMAL64));
+        BigDecimal denominator = onePlusRate.pow(loan.loanTerm(), MathContext.DECIMAL64).subtract(BigDecimal.ONE);
 
-        return loan.getAmount()
-                .multiply(monthlyRate)
-                .divide(BigDecimal.ONE.subtract(onePlusRatePow), DEFAULT_DECIMAL_SCALE, DEFAULT_ROUNDING_MODE);
+        return loan.amount()
+                .multiply(numerator)
+                .divide(denominator, DEFAULT_DECIMAL_SCALE, DEFAULT_ROUNDING_MODE);
     }
 }

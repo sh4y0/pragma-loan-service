@@ -11,5 +11,4 @@ public interface LoanStatusRepository {
 
     Mono<LoanStatus> findByName(String status);
     Flux<UUID> findIdsByNames(List<String> statusNames);
-    Flux<LoanStatus> findByIds(List<UUID> uuids);
 }

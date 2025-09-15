@@ -65,34 +65,6 @@ class LoanStatusReactiveRepositoryAdapterTest {
     }
 
     @Test
-    void findByIds_success() {
-        List<UUID> ids = List.of(statusId);
-
-        when(repository.findAllById(ids)).thenReturn(Flux.just(loanStatusEntity));
-        when(mapper.map(loanStatusEntity, LoanStatus.class)).thenReturn(loanStatus);
-
-        Flux<LoanStatus> result = repositoryAdapter.findByIds(ids);
-
-        StepVerifier.create(result)
-                .expectNextMatches(l -> l.getIdStatus().equals(statusId) && l.getName().equals("PENDING"))
-                .verifyComplete();
-
-        verify(repository, times(1)).findAllById(ids);
-    }
-
-    @Test
-    void findByIds_emptyList() {
-        List<UUID> ids = List.of();
-
-        when(repository.findAllById(ids)).thenReturn(Flux.empty());
-
-        StepVerifier.create(repositoryAdapter.findByIds(ids))
-                .verifyComplete();
-
-        verify(repository, times(1)).findAllById(ids);
-    }
-
-    @Test
     void findIdsByNames_success() {
         List<String> names = List.of("PENDING");
 

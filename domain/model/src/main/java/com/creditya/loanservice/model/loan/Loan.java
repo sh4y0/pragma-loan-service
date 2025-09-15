@@ -14,7 +14,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder(toBuilder = true)
 public class Loan {
-    private UUID loanId;
+    private UUID idLoan;
     private BigDecimal amount;
     private Integer loanTerm;
     private String email;
